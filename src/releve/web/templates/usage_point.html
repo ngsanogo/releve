@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}{{ usage_point.label }} — releve{% endblock %}
+{% block content %}
+<h1>{{ usage_point.label }} <code>{{ usage_point.id }}</code></h1>
+<h2>Last {{ rows | length }} days</h2>
+<div class="table">
+  <table>
+    <thead>
+      <tr>
+        <th>Day</th>
+        {% if usage_point.consumption %}<th>Consumption (kWh)</th>{% endif %}
+        {% if usage_point.production %}<th>Production (kWh)</th>{% endif %}
+        {% if usage_point.max_power %}<th>Max power (VA)</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+    {% for row in rows %}
+      <tr>
+        <td>{{ row.day }}</td>
+        {% if usage_point.consumption %}<td class="number">{{ "%.3f" | format(row.consumption_wh / 1000) if row.consumption_wh is not none else "—" }}</td>{% endif %}
+        {% if usage_point.production %}<td class="number">{{ "%.3f" | format(row.production_wh / 1000) if row.production_wh is not none else "—" }}</td>{% endif %}
+        {% if usage_point.max_power %}<td class="number">{{ row.max_power_va if row.max_power_va is not none else "—" }}</td>{% endif %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

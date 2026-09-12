@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block content %}
+{% if tempo or ecowatt %}
+<section class="card">
+  <h2>Today</h2>
+  <dl>
+    <dt>Tempo</dt>
+    <dd>{% if tempo %}<span class="tempo tempo-{{ tempo.color | lower }}">{{ tempo.color }}</span>{% else %}—{% endif %}</dd>
+    <dt>Ecowatt</dt>
+    <dd>{% if ecowatt %}{{ ecowatt.level }}{% if ecowatt.message %} — {{ ecowatt.message }}{% endif %}{% else %}—{% endif %}</dd>
+  </dl>
+</section>
+{% endif %}
+
+<h1>Usage points</h1>
+{% for view in usage_points %}
+<section class="card">
+  <h2><a href="/usage-points/{{ view.settings.id }}">{{ view.settings.label }}</a> <code>{{ view.settings.id }}</code></h2>
+  <dl>
+    <dt>Last successful sync</dt>
+    <dd>{{ view.last_success | paris }}</dd>
+    <dt>Gateway calls today</dt>
+    <dd>
+      {{ view.quota.used }}/{{ budget }}
+      {% if view.quota.blocked_until %}
+      <span class="blocked">— blocked until {{ view.quota.blocked_until | paris }} ({{ view.quota.blocked_cause }})</span>
+      {% endif %}
+    </dd>
+  </dl>
+  <div class="table">
+    <table>
+      <thead><tr><th>Dataset</th><th>Newest day</th><th>Days still to fetch</th></tr></thead>
+      <tbody>
+      {% for item in view.datasets %}
+        <tr>
+          <td>{{ item.dataset }}</td>
+          <td>{{ item.latest or "—" }}</td>
+          <td class="number">{{ item.missing }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="3" class="muted">No dataset enabled.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% else %}
+<p class="muted">No usage point configured.</p>
+{% endfor %}
+
+{% if rte_quota %}
+<p class="muted">Tempo/Ecowatt calls today: {{ rte_quota.used }}/{{ budget }}
+{% if rte_quota.blocked_until %}<span class="blocked">— blocked until {{ rte_quota.blocked_until | paris }}</span>{% endif %}</p>
+{% endif %}
+
+{% if exports %}
+<h2>Exports</h2>
+<div class="table">
+  <table>
+    <thead><tr><th>Destination</th><th>Last delivery</th><th>Up to run</th></tr></thead>
+    <tbody>
+    {% for cursor in exports %}
+      <tr><td class="detail">{{ cursor.sink }}</td><td>{{ cursor.exported_at | paris }}</td><td class="number">{{ cursor.run_id }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<h2>Journal</h2>
+<div class="table">
+  <table>
+    <thead><tr><th>When</th><th>Run</th><th>Subject</th><th></th><th>Detail</th></tr></thead>
+    <tbody>
+    {% for event in events %}
+      <tr>
+        <td>{{ event.at | paris }}</td>
+        <td class="number">{{ event.run_id }}</td>
+        <td><code>{{ event.subject }}</code></td>
+        <td class="{{ 'ok' if event.ok else 'failed' }}">{{ "✔" if event.ok else "✘" }}</td>
+        <td class="detail">{{ event.detail }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5" class="muted">No sync pass yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

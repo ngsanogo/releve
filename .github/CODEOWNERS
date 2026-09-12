@@ -1,0 +1,8 @@
+# Default owners for everything in this repository.
+* @ngsanogo
+
+# Raise the bar on supply-chain and release surfaces.
+/.github/workflows/ @ngsanogo
+/SECURITY.md @ngsanogo
+/Dockerfile @ngsanogo
+/docker-compose.yaml @ngsanogo
