@@ -1,0 +1,48 @@
+name: Bug report
+description: Something misbehaves
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Include the exact error message (with tokens and your PDL redacted).
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Minimal sequence (config shape, CLI commands). Redact secrets.
+      placeholder: |
+        1. releve init
+        2. Enable mqtt exporter
+        3. Run `releve sync`
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `releve version`
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS / install method
+      description: e.g. Debian 12 + `uv tool install`, or Docker on Raspberry Pi OS
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Output of `releve sync` or `releve status`, or the daemon logs — tokens and PDL redacted.
+      render: text

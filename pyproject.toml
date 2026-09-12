@@ -1,0 +1,136 @@
+[build-system]
+requires = ["uv_build>=0.12.7,<0.13"]
+build-backend = "uv_build"
+
+[project]
+name = "releve"
+version = "0.1.0"
+description = "Self-hosted, quota-aware cache of French electricity meter readings, with Home Assistant, MQTT and InfluxDB/VictoriaMetrics exports."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Issa Sanogo", email = "ngsanogo@proton.me" }]
+keywords = [
+  "electricity",
+  "smart-meter",
+  "home-assistant",
+  "mqtt",
+  "energy",
+  "influxdb",
+  "victoriametrics",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: No Input/Output (Daemon)",
+  "Intended Audience :: End Users/Desktop",
+  "Natural Language :: English",
+  "Operating System :: POSIX",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Home Automation",
+  "Typing :: Typed",
+]
+dependencies = [
+  "httpx2>=2.9",
+  "jinja2>=3.1.6",
+  "paho-mqtt>=2.1",
+  "pydantic>=2.11",
+  "pydantic-settings[yaml]>=2.10",
+  "starlette>=0.47",
+  "uvicorn>=0.35",
+  "websockets>=15",
+]
+
+[project.urls]
+Homepage = "https://github.com/ngsanogo/releve"
+Issues = "https://github.com/ngsanogo/releve/issues"
+Changelog = "https://github.com/ngsanogo/releve/blob/main/CHANGELOG.md"
+
+[project.scripts]
+releve = "releve.cli:run"
+
+[dependency-groups]
+dev = [
+  "hypothesis>=6.130",
+  "mypy>=1.16",
+  "pip-audit>=2.9",
+  "pytest>=8.4",
+  "pytest-cov>=6.2",
+  "ruff>=0.12",
+  "types-PyYAML>=6.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+  "A",    # builtins shadowing
+  "ARG",  # unused arguments
+  "B",    # bugbear
+  "BLE",  # blind except
+  "C4",   # comprehensions
+  "DTZ",  # naive datetimes
+  "E",    # pycodestyle
+  "F",    # pyflakes
+  "FURB", # refurb
+  "G",    # logging format
+  "I",    # isort
+  "ISC",  # implicit string concatenation
+  "LOG",  # logging
+  "N",    # naming
+  "PERF", # performance
+  "PIE",  # misc lints
+  "PT",   # pytest style
+  "PTH",  # pathlib
+  "RET",  # returns
+  "RUF",  # ruff-specific
+  "S",    # bandit (security)
+  "SIM",  # simplify
+  "T20",  # print
+  "UP",   # pyupgrade
+  "W",    # pycodestyle warnings
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The CLI talks to humans through stdout.
+"src/releve/cli.py" = ["T201"]
+# Asserts are the point of tests; fixtures use obviously fake secrets.
+"tests/*" = ["S101", "S105", "S106"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+mypy_path = "src"
+packages = ["releve", "tests"]
+warn_unreachable = true
+plugins = ["pydantic.mypy"]
+pretty = true
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+warn_required_dynamic_aliases = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+xfail_strict = true
+filterwarnings = [
+  "error",
+  # Starlette's test client still uses this anyio alias; not ours to fix.
+  "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["releve"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError", "\\.\\.\\."]

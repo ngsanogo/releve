@@ -1,0 +1,158 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint:
+    name: lint · format · types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run ruff check src tests
+      - run: uv run ruff format --check src tests
+      - run: uv run mypy
+
+  test:
+    name: tests (python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13", "3.14"]
+    env:
+      MQTT_TEST_BROKER: 127.0.0.1:1883
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Start an MQTT broker
+        run: docker run --detach --publish 127.0.0.1:1883:1883 eclipse-mosquitto:2 mosquitto -c /mosquitto-no-auth.conf
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run pytest --cov --cov-report=term-missing --cov-fail-under=90
+
+  audit:
+    name: dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: Audit the locked production dependencies
+        run: |
+          uv export --frozen --no-dev --no-emit-project --output-file "$RUNNER_TEMP/requirements.txt"
+          uv run pip-audit --requirement "$RUNNER_TEMP/requirements.txt" --disable-pip --progress-spinner off
+
+  package:
+    name: wheel · clean install smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      - run: uv build
+      - name: Install the wheel alone and use it
+        env:
+          XDG_CONFIG_HOME: ${{ runner.temp }}/config
+          XDG_STATE_HOME: ${{ runner.temp }}/state
+          RELEVE_GATEWAY__TOKEN: not-a-real-token
+        run: |
+          uv venv "$RUNNER_TEMP/venv"
+          uv pip install --python "$RUNNER_TEMP/venv" dist/releve-*.whl
+          export PATH="$RUNNER_TEMP/venv/bin:$PATH"
+          releve version
+          python -m releve version
+          releve init
+          releve check
+          releve status
+          test -f "$XDG_STATE_HOME/releve/releve.db"
+
+  image:
+    name: image (amd64 + arm64) · container smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - name: Build both architectures
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Load the amd64 image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          load: true
+          tags: releve:ci
+          cache-from: type=gha
+      - name: Serve with a configuration and wait until healthy
+        run: |
+          cat > "$RUNNER_TEMP/config.yaml" <<'YAML'
+          gateway:
+            token: not-a-real-token
+            base_url: https://127.0.0.1:9
+          usage_points:
+            - id: "01234567890123"
+          sync:
+            rte_signals: false
+          YAML
+          chmod 644 "$RUNNER_TEMP/config.yaml"
+          docker run --detach --name smoke --publish 127.0.0.1:8080:8080 \
+            --volume "$RUNNER_TEMP/config.yaml:/home/app/config.yaml:ro" releve:ci
+          for _ in $(seq 30); do
+            if curl --silent --fail http://127.0.0.1:8080/healthz; then exit 0; fi
+            sleep 2
+          done
+          docker logs smoke
+          exit 1
+
+  secrets:
+    name: secret scan
+    runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: 8.30.1
+      GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install gitleaks (checksum verified)
+        run: |
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl --silent --show-error --fail --location --output "$RUNNER_TEMP/$archive" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/$archive" | sha256sum --check
+          tar --extract --gzip --file "$RUNNER_TEMP/$archive" --directory "$RUNNER_TEMP" gitleaks
+      - name: Scan the working tree and the history
+        run: '"$RUNNER_TEMP/gitleaks" git --verbose --redact .'

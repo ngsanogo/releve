@@ -1,0 +1,67 @@
+# releve configuration.
+#
+# Every key can be overridden from the environment: RELEVE_ prefix, "__"
+# between levels, e.g. RELEVE_GATEWAY__TOKEN=... for gateway.token.
+# Unknown keys are errors. `releve check` explains what this file means.
+
+gateway:
+  token: ""                 # REQUIRED — generate it on https://www.myelectricaldata.fr
+  prefer_cache: true        # ask the gateway's cache endpoints first (lighter on Enedis)
+  daily_call_budget: 45     # local ceiling per usage point; the gateway allows 50 a day
+  timeout_seconds: 30
+
+usage_points:
+  - id: "01234567890123"    # REQUIRED — your 14-digit PDL, quoted
+    name: "Home"
+    consumption: true       # daily consumption
+    consumption_detail: false  # 30-minute load curve: hourly Home Assistant statistics
+    production: false       # daily production
+    production_detail: false
+    max_power: false        # daily maximum apparent power
+
+sync:
+  history_days: 365         # days kept complete in the cache (load curve: at most 729)
+  interval_hours: 4         # Enedis publishes once a day; more often only catches up sooner
+  rte_signals: true         # Tempo colors and Ecowatt signals
+
+# storage:
+#   path: /absolute/path/to/releve.db   # default: ~/.local/state/releve/releve.db
+
+exporters:
+  mqtt:
+    enabled: false
+    host: "127.0.0.1"
+    port: 1883
+    tls: false
+    # tls_ca_certs: /path/to/ca.pem
+    username: ""
+    password: ""
+    base_topic: "releve"
+    home_assistant_discovery: true
+    discovery_prefix: "homeassistant"
+
+  home_assistant:           # long-term statistics, visible in the Energy dashboard
+    enabled: false
+    url: "ws://homeassistant.local:8123/api/websocket"
+    token: ""               # a long-lived access token
+    # {pdl} is replaced by the usage point id. To continue a series another
+    # integration started, set its id here: releve appends after its last point.
+    statistic_id: "releve:{pdl}_consumption"
+    statistic_name: "Electricity consumption {pdl}"
+    production_statistic_id: "releve:{pdl}_production"
+    production_statistic_name: "Electricity production {pdl}"
+
+  influxdb:                 # InfluxDB v2, or VictoriaMetrics (same write endpoint)
+    enabled: false
+    url: "http://127.0.0.1:8086/api/v2/write"
+    token: ""
+    org: ""
+    bucket: "energy"
+    measurement: "energy"
+
+web:
+  host: "127.0.0.1"
+  port: 8080
+  # auth_token: ""          # required on every route but /healthz (Bearer, or Basic password)
+
+log_level: "INFO"

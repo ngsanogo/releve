@@ -1,0 +1,23 @@
+name: Question
+description: How does this work? Is my use case supported?
+labels: [question]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What are you trying to do? Include your (redacted) config shape if relevant — never paste your gateway token or your real PDL.
+    validations:
+      required: true
+  - type: dropdown
+    id: already
+    attributes:
+      label: Have you checked?
+      multiple: true
+      options:
+        - README.md
+        - releve check
+        - docs/architecture.md
+        - Existing issues
+    validations:
+      required: false
