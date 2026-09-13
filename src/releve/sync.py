@@ -5,6 +5,10 @@ The rules a pass lives by:
 * one pass at a time per database, across processes (an advisory file lock);
 * a quota refusal, a refused token or an unreachable gateway stops the usage
   point it concerns — never the others;
+* consent is checked before metering; an invalid or banned consent stops the
+  usage point without burning the rest of the budget;
+* a customer resource the gateway cannot give is asked again a day later, not
+  on every pass;
 * every answer is cached before any exporter runs; exporters read the cache
   from where they last stopped, so a failed delivery is retried, not lost;
 * every outcome, success or failure, is journaled.
@@ -17,13 +21,13 @@ import logging
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import assert_never
 
 from releve.clock import Clock, paris_today, utc_now
 from releve.config import Settings, UsagePointSettings
-from releve.domain import Dataset, Direction
+from releve.domain import CustomerResource, Dataset, Direction
 from releve.errors import (
     AuthError,
     ExportError,
@@ -50,6 +54,8 @@ log = logging.getLogger(__name__)
 JOURNAL_KEEP = timedelta(days=90)
 GATEWAY_CALLS_KEEP = timedelta(days=30)
 TEMPO_BACKFILL = timedelta(days=30)
+# A customer resource the gateway could not give is asked again after this long.
+CUSTOMER_RETRY = timedelta(days=1)
 
 _DIRECTION = {
     Dataset.DAILY_CONSUMPTION: Direction.CONSUMPTION,
@@ -99,9 +105,9 @@ def run_pass(
             outcomes.append(outcome)
 
         if settings.sync.rte_signals:
-            journal(sync_rte(gateway, store, today))
+            journal(sync_rte(gateway, store, today, clock))
         for usage_point in settings.usage_points:
-            journal(sync_usage_point(usage_point, settings, gateway, store, run_id, today))
+            journal(sync_usage_point(usage_point, settings, gateway, store, run_id, today, clock))
         for exporter in exporters:
             journal(export(exporter, store, run_id, clock))
 
@@ -128,16 +134,29 @@ def exclusive_pass(database: Path) -> Iterator[None]:
             fcntl.flock(handle, fcntl.LOCK_UN)
 
 
-def sync_rte(gateway: Gateway, store: Store, today: date) -> Outcome:
-    """Tempo colors (with a month of history) and Ecowatt signals (with the days ahead)."""
+def sync_rte(gateway: Gateway, store: Store, today: date, clock: Clock = utc_now) -> Outcome:
+    """Tempo colors, Ecowatt (daily + hourly); Tempo season and prices once per Paris day."""
     try:
         tempo = gateway.tempo(today - TEMPO_BACKFILL, today + timedelta(days=2))
         store.upsert_tempo(tempo)
-        ecowatt = gateway.ecowatt(today - timedelta(days=1), today + timedelta(days=3))
-        store.upsert_ecowatt(ecowatt)
+        # RTE publishes Ecowatt up to three days ahead; yesterday's signal comes along.
+        forecast = gateway.ecowatt(today - timedelta(days=1), today + timedelta(days=4))
+        store.upsert_ecowatt(forecast.days)
+        store.upsert_ecowatt_hours(forecast.hours)
+        detail = (
+            f"tempo: {len(tempo)} days, ecowatt: {len(forecast.days)} days/"
+            f"{len(forecast.hours)} hours"
+        )
+        fetched_at = store.tempo_extras_fetched_at()
+        if fetched_at is None or paris_today(fetched_at) < today:
+            now = clock()
+            store.upsert_tempo_season(gateway.tempo_season(), at=now)
+            prices = gateway.tempo_prices()
+            store.upsert_tempo_prices(prices, at=now)
+            detail += f", season + {len(prices)} prices"
     except GatewayError as exc:
         return Outcome(RTE_BUCKET, False, str(exc))
-    return Outcome(RTE_BUCKET, True, f"tempo: {len(tempo)} days, ecowatt: {len(ecowatt)} days")
+    return Outcome(RTE_BUCKET, True, detail)
 
 
 def sync_usage_point(
@@ -147,9 +166,36 @@ def sync_usage_point(
     store: Store,
     run_id: int,
     today: date,
+    clock: Clock = utc_now,
 ) -> Outcome:
-    changes: list[str] = []
+    now = clock()
+    customer_due = due_customer_resources(usage_point, settings, store, now)
+    metering_due = any(
+        backlog(store, usage_point.id, dataset, settings.sync.history_days, today)
+        for dataset in usage_point.datasets
+    )
+    if not customer_due and not metering_due:
+        return Outcome(usage_point.id, True, "nothing to fetch")  # an idle pass asks nothing
+
+    try:
+        consent = gateway.valid_access(usage_point.id)
+        store.upsert_consent(consent, at=now)
+    except GatewayError as exc:
+        return Outcome(usage_point.id, False, str(exc))
+    if not consent.granted:
+        reason = consent.information or ("banned" if consent.banned else "consent invalid")
+        return Outcome(usage_point.id, False, f"consent refused: {reason}")
+    changes = ["consent ok"]
     problems: list[str] = []
+
+    try:
+        refreshed, problems = sync_customer(usage_point.id, customer_due, gateway, store, now)
+        changes.extend(refreshed)
+    except (RetryLaterError, AuthError, GatewayUnreachableError) as exc:
+        problems.append(str(exc))
+        detail = "; ".join(filter(None, [", ".join(changes), *problems]))
+        return Outcome(usage_point.id, False, detail)
+
     for dataset in usage_point.datasets:
         try:
             changed = sync_dataset(
@@ -164,6 +210,63 @@ def sync_usage_point(
         changes.append(f"{dataset} +{changed}")
     detail = "; ".join(filter(None, [", ".join(changes), *problems])) or "nothing to fetch"
     return Outcome(usage_point.id, not problems, detail)
+
+
+def due_customer_resources(
+    usage_point: UsagePointSettings, settings: Settings, store: Store, now: datetime
+) -> list[CustomerResource]:
+    """The enabled customer resources to fetch now.
+
+    A resource is due when its cached copy is missing or older than the refresh
+    period — unless its last fetch failed less than `CUSTOMER_RETRY` ago.
+    """
+    refresh_after = timedelta(days=settings.sync.customer_refresh_days)
+    failures = store.customer_failures(usage_point.id)
+    return [
+        resource
+        for resource in usage_point.customer_resources
+        if _due(store.customer_fetched_at(usage_point.id, resource), now, refresh_after)
+        and (resource not in failures or _due(failures[resource].failed_at, now, CUSTOMER_RETRY))
+    ]
+
+
+def sync_customer(
+    pdl: str, due: Sequence[CustomerResource], gateway: Gateway, store: Store, now: datetime
+) -> tuple[list[str], list[str]]:
+    """Refresh the `due` customer resources; returns those refreshed and the problems met.
+
+    A resource the gateway cannot give is recorded as failed, which holds its
+    next attempt back, and does not keep the others from refreshing. A quota,
+    token or transport failure is not the resource's doing: it is raised, as
+    nothing more can be asked for this usage point.
+    """
+    changed: list[str] = []
+    problems: list[str] = []
+    for resource in due:
+        try:
+            match resource:
+                case CustomerResource.CONTRACT:
+                    store.upsert_contract(gateway.contract(pdl), at=now)
+                case CustomerResource.IDENTITY:
+                    store.upsert_identity(gateway.identity(pdl), at=now)
+                case CustomerResource.CONTACT:
+                    store.upsert_contact(gateway.contact(pdl), at=now)
+                case CustomerResource.ADDRESSES:
+                    store.upsert_address(gateway.addresses(pdl), at=now)
+                case _:
+                    assert_never(resource)
+        except (RetryLaterError, AuthError, GatewayUnreachableError):
+            raise
+        except GatewayError as exc:
+            store.record_customer_failure(pdl, resource, at=now, detail=str(exc))
+            problems.append(str(exc))
+            continue
+        changed.append(resource)
+    return changed, problems
+
+
+def _due(fetched_at: datetime | None, now: datetime, refresh_after: timedelta) -> bool:
+    return fetched_at is None or now - fetched_at >= refresh_after
 
 
 def backlog(

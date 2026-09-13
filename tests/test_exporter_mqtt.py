@@ -83,6 +83,10 @@ def test_state_reports_complete_windows_and_null_otherwise(
         "tempo_today": "RED",
         "ecowatt_today": 3,
         "ecowatt_message": "coupures possibles",
+        "tempo_days_left_blue": None,
+        "tempo_days_left_white": None,
+        "tempo_days_left_red": None,
+        "tempo_prices": None,
     }
 
 

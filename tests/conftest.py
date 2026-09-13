@@ -64,7 +64,8 @@ def make_settings(database: Path, **overrides: Any) -> Settings:
     """Settings for one consumption-only usage point, with `overrides` merged per section."""
     data: dict[str, Any] = {
         "gateway": {"token": "test-token"},
-        "usage_points": [{"id": PDL, "name": "Home"}],
+        # contract off by default in tests: metering assertions stay about metering.
+        "usage_points": [{"id": PDL, "name": "Home", "contract": False}],
         "storage": {"path": str(database)},
         "sync": {"rte_signals": False},
     }

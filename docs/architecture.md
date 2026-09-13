@@ -37,6 +37,8 @@ cli                            composition root
 | `legacy.py` | One-way import of a database in the earlier SQLAlchemy layout |
 | `quota.py` | `QuotaGovernor`: reserve before sending, settle after, honor blocks |
 | `gateway.py` | The only HTTP to the gateway, and the parsing of its answers |
+| `curve.py` | Complete-grid load-curve arithmetic shared by exporters |
+| `tariffs.py` | Off-peak hours from the contract; energy split by period |
 | `planning.py` | Missing days, fetch windows, settled gaps — pure functions |
 | `sync.py` | One pass; the pass lock; the journal; exporter cursors |
 | `exporters/` | Home Assistant statistics, MQTT with discovery, Influx line protocol |

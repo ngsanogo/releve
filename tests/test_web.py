@@ -10,7 +10,16 @@ import pytest
 from starlette.testclient import TestClient
 
 from releve.clock import at_paris_hour
-from releve.domain import DailyEnergy, Direction, EcowattDay, PowerPeak, TempoDay
+from releve.domain import (
+    Contact,
+    CustomerResource,
+    DailyEnergy,
+    Direction,
+    EcowattDay,
+    EcowattHour,
+    PowerPeak,
+    TempoDay,
+)
 from releve.quota import QuotaGovernor
 from releve.scheduler import Scheduler
 from releve.store import Store
@@ -156,3 +165,49 @@ def test_the_auth_token_guards_everything_but_health(
         client.get("/static/style.css", headers={"Authorization": "Bearer s3cret"}).status_code
         == 200
     )
+
+
+def test_hourly_ecowatt_is_served_per_paris_day(
+    database: Path, store: Store, governor: QuotaGovernor, clock: FrozenClock
+) -> None:
+    store.upsert_ecowatt_hours(
+        [
+            EcowattHour(at_paris_hour(day, hour), day.day)
+            for day in (YESTERDAY, TODAY)
+            for hour in (0, 23)
+        ]
+    )
+    api = TestClient(create_app(make_settings(database), store, governor, clock=clock))
+
+    tomorrow = TODAY + timedelta(days=1)
+    answer = api.get(
+        "/api/v1/rte/ecowatt/hours", params={"start": str(TODAY), "end": str(tomorrow)}
+    )
+
+    assert answer.json() == [
+        {"at": "2026-09-11T22:00:00+00:00", "value": 12},
+        {"at": "2026-09-12T21:00:00+00:00", "value": 12},
+    ]
+
+
+def test_the_usage_point_page_shows_customer_data_that_could_not_be_fetched(
+    database: Path, store: Store, governor: QuotaGovernor, clock: FrozenClock
+) -> None:
+    detail = "identity: the gateway refused the window (HTTP 404)"
+    store.record_customer_failure(PDL, CustomerResource.IDENTITY, at=NOW, detail=detail)
+    for enabled in (True, False):
+        settings = make_settings(database, usage_points=[{"id": PDL, "identity": enabled}])
+        page = TestClient(create_app(settings, store, governor, clock=clock)).get(
+            f"/usage-points/{PDL}"
+        )
+        assert (detail in page.text) is enabled
+
+
+def test_customer_data_is_served_only_while_enabled(
+    database: Path, store: Store, governor: QuotaGovernor, clock: FrozenClock
+) -> None:
+    store.upsert_contact(Contact(PDL, phone="0102030405", email="a@b.c"), at=NOW)
+    for enabled, status in ((True, 200), (False, 404)):
+        settings = make_settings(database, usage_points=[{"id": PDL, "contact": enabled}])
+        api = TestClient(create_app(settings, store, governor, clock=clock))
+        assert api.get(f"/api/v1/usage-points/{PDL}/contact").status_code == status

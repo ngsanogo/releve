@@ -12,9 +12,18 @@ from pathlib import Path
 import pytest
 
 from releve.clock import day_start, next_utc_midnight, utc_midnight
-from releve.domain import DailyEnergy, Dataset, Direction, LoadCurvePoint, PowerPeak
+from releve.domain import (
+    CustomerResource,
+    DailyEnergy,
+    Dataset,
+    Direction,
+    EcowattDay,
+    Identity,
+    LoadCurvePoint,
+    PowerPeak,
+)
 from releve.errors import StoreError
-from releve.store import HaBoundary, Refusal, Store, migrations
+from releve.store import CustomerFailure, HaBoundary, Refusal, Store, migrations
 from tests.conftest import NOW, PDL, FrozenClock
 
 DAY = date(2026, 9, 10)
@@ -48,6 +57,40 @@ def test_a_database_from_the_future_is_refused(database: Path, store: Store) -> 
         conn.execute("PRAGMA user_version = 99")
     with pytest.raises(StoreError, match="newer than this releve"):
         Store.open(database)
+
+
+def test_upgrading_from_version_1_dates_ecowatt_days_one_day_later(database: Path) -> None:
+    database.parent.mkdir(parents=True)
+    with closing(sqlite3.connect(database)) as conn, conn:
+        conn.executescript(migrations()[0])
+        conn.executemany(
+            "INSERT INTO ecowatt_day (day, level, message) VALUES (?, ?, ?)",
+            [("2026-09-11", 1, "a"), ("2026-09-12", 2, "b"), ("2026-09-13", 3, "c")],
+        )
+        conn.execute("PRAGMA user_version = 1")
+
+    store = Store.open(database)
+
+    assert store.ecowatt(date.min, date.max) == [
+        EcowattDay(date(2026, 9, 12), 1, "a"),
+        EcowattDay(date(2026, 9, 13), 2, "b"),
+        EcowattDay(date(2026, 9, 14), 3, "c"),
+    ]
+
+
+def test_a_customer_failure_is_forgotten_once_the_resource_is_cached(store: Store) -> None:
+    store.record_customer_failure(PDL, CustomerResource.IDENTITY, at=NOW, detail="HTTP 404")
+    store.record_customer_failure(PDL, CustomerResource.CONTACT, at=NOW, detail="HTTP 500")
+    assert store.customer_failures(PDL) == {
+        CustomerResource.IDENTITY: CustomerFailure(NOW, "HTTP 404"),
+        CustomerResource.CONTACT: CustomerFailure(NOW, "HTTP 500"),
+    }
+    assert store.customer_fetched_at(PDL, CustomerResource.IDENTITY) is None
+
+    store.upsert_identity(Identity(PDL, firstname="Ada"), at=NOW)
+
+    assert set(store.customer_failures(PDL)) == {CustomerResource.CONTACT}
+    assert store.customer_fetched_at(PDL, CustomerResource.IDENTITY) == NOW
 
 
 def test_an_unusable_path_is_a_store_error(tmp_path: Path) -> None:

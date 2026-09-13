@@ -44,7 +44,14 @@ def test_passes_never_overspend_and_eventually_complete_the_cache(
         governor = QuotaGovernor(store, budget, clock)
         config = make_settings(
             database,
-            usage_points=[{"id": PDL, "max_power": True, "consumption_detail": curve}],
+            usage_points=[
+                {
+                    "id": PDL,
+                    "max_power": True,
+                    "consumption_detail": curve,
+                    "contract": False,
+                }
+            ],
             sync={"history_days": history},
         )
         start_day = paris_today(NOW)

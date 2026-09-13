@@ -22,19 +22,31 @@ from collections.abc import Iterable, Iterator
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime
+from decimal import Decimal
 from importlib.resources import files
 from pathlib import Path
 
 from releve import legacy
 from releve.clock import Clock, from_unix, to_unix, utc_now
 from releve.domain import (
+    Address,
+    Consent,
+    Contact,
+    Contract,
+    CustomerResource,
     DailyEnergy,
     Dataset,
     Direction,
     EcowattDay,
+    EcowattHour,
+    Identity,
     LoadCurvePoint,
+    Period,
     PowerPeak,
+    TempoColor,
     TempoDay,
+    TempoPrice,
+    TempoSeason,
 )
 from releve.errors import StoreError
 
@@ -64,6 +76,14 @@ class RunEvent:
     at: datetime
     subject: str
     ok: bool
+    detail: str
+
+
+@dataclass(frozen=True, slots=True)
+class CustomerFailure:
+    """The last failed fetch of a customer resource."""
+
+    failed_at: datetime
     detail: str
 
 
@@ -492,6 +512,227 @@ class Store:
             ).fetchall()
         return [PowerPeak(up, date.fromisoformat(d), va, from_unix(at)) for up, d, va, at in rows]
 
+    # -- Consent, contract, customer ------------------------------------------------------
+    def upsert_consent(self, consent: Consent, *, at: datetime) -> None:
+        with self._write() as conn:
+            conn.execute(
+                "INSERT INTO consent ("
+                "  usage_point, checked_at, valid, expires_at, call_number, quota_limit,"
+                "  quota_reached, quota_reset_at, last_call_at, banned, information"
+                ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT (usage_point) DO UPDATE SET "
+                "checked_at = excluded.checked_at, valid = excluded.valid, "
+                "expires_at = excluded.expires_at, call_number = excluded.call_number, "
+                "quota_limit = excluded.quota_limit, quota_reached = excluded.quota_reached, "
+                "quota_reset_at = excluded.quota_reset_at, last_call_at = excluded.last_call_at, "
+                "banned = excluded.banned, information = excluded.information",
+                (
+                    consent.usage_point,
+                    to_unix(at),
+                    int(consent.valid),
+                    to_unix(consent.expires_at) if consent.expires_at else None,
+                    consent.call_number,
+                    consent.quota_limit,
+                    int(consent.quota_reached),
+                    to_unix(consent.quota_reset_at) if consent.quota_reset_at else None,
+                    to_unix(consent.last_call_at) if consent.last_call_at else None,
+                    int(consent.banned),
+                    consent.information,
+                ),
+            )
+
+    def consent(self, usage_point: str) -> Consent | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT usage_point, valid, expires_at, call_number, quota_limit, "
+                "quota_reached, quota_reset_at, last_call_at, banned, information "
+                "FROM consent WHERE usage_point = ?",
+                (usage_point,),
+            ).fetchone()
+        return _consent(row) if row is not None else None
+
+    def upsert_contract(self, contract: Contract, *, at: datetime) -> None:
+        with self._write() as conn:
+            conn.execute(
+                "INSERT INTO contract ("
+                "  usage_point, fetched_at, segment, subscribed_power, distribution_tariff,"
+                "  offpeak_hours, contract_status, last_activation_date,"
+                "  last_tariff_change_date, meter_type, usage_point_status"
+                ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT (usage_point) DO UPDATE SET "
+                "fetched_at = excluded.fetched_at, segment = excluded.segment, "
+                "subscribed_power = excluded.subscribed_power, "
+                "distribution_tariff = excluded.distribution_tariff, "
+                "offpeak_hours = excluded.offpeak_hours, "
+                "contract_status = excluded.contract_status, "
+                "last_activation_date = excluded.last_activation_date, "
+                "last_tariff_change_date = excluded.last_tariff_change_date, "
+                "meter_type = excluded.meter_type, "
+                "usage_point_status = excluded.usage_point_status",
+                (
+                    contract.usage_point,
+                    to_unix(at),
+                    contract.segment,
+                    contract.subscribed_power,
+                    contract.distribution_tariff,
+                    contract.offpeak_hours,
+                    contract.contract_status,
+                    contract.last_activation_date,
+                    contract.last_tariff_change_date,
+                    contract.meter_type,
+                    contract.usage_point_status,
+                ),
+            )
+            _forget_failure(conn, contract.usage_point, CustomerResource.CONTRACT)
+
+    def contract(self, usage_point: str) -> Contract | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT usage_point, segment, subscribed_power, distribution_tariff, "
+                "offpeak_hours, contract_status, last_activation_date, "
+                "last_tariff_change_date, meter_type, usage_point_status "
+                "FROM contract WHERE usage_point = ?",
+                (usage_point,),
+            ).fetchone()
+        return Contract(*row) if row is not None else None
+
+    def upsert_identity(self, identity: Identity, *, at: datetime) -> None:
+        with self._write() as conn:
+            conn.execute(
+                "INSERT INTO identity (usage_point, fetched_at, customer_id, title, "
+                "firstname, lastname) VALUES (?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT (usage_point) DO UPDATE SET "
+                "fetched_at = excluded.fetched_at, customer_id = excluded.customer_id, "
+                "title = excluded.title, firstname = excluded.firstname, "
+                "lastname = excluded.lastname",
+                (
+                    identity.usage_point,
+                    to_unix(at),
+                    identity.customer_id,
+                    identity.title,
+                    identity.firstname,
+                    identity.lastname,
+                ),
+            )
+            _forget_failure(conn, identity.usage_point, CustomerResource.IDENTITY)
+
+    def identity(self, usage_point: str) -> Identity | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT usage_point, customer_id, title, firstname, lastname "
+                "FROM identity WHERE usage_point = ?",
+                (usage_point,),
+            ).fetchone()
+        if row is None:
+            return None
+        return Identity(*row)
+
+    def upsert_contact(self, contact: Contact, *, at: datetime) -> None:
+        with self._write() as conn:
+            conn.execute(
+                "INSERT INTO contact (usage_point, fetched_at, customer_id, phone, email) "
+                "VALUES (?, ?, ?, ?, ?) ON CONFLICT (usage_point) DO UPDATE SET "
+                "fetched_at = excluded.fetched_at, customer_id = excluded.customer_id, "
+                "phone = excluded.phone, email = excluded.email",
+                (
+                    contact.usage_point,
+                    to_unix(at),
+                    contact.customer_id,
+                    contact.phone,
+                    contact.email,
+                ),
+            )
+            _forget_failure(conn, contact.usage_point, CustomerResource.CONTACT)
+
+    def contact(self, usage_point: str) -> Contact | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT usage_point, customer_id, phone, email FROM contact WHERE usage_point = ?",
+                (usage_point,),
+            ).fetchone()
+        if row is None:
+            return None
+        return Contact(*row)
+
+    def upsert_address(self, address: Address, *, at: datetime) -> None:
+        with self._write() as conn:
+            conn.execute(
+                "INSERT INTO address ("
+                "  usage_point, fetched_at, customer_id, street, locality, postal_code,"
+                "  insee_code, city, country, latitude, longitude, altitude,"
+                "  meter_type, usage_point_status"
+                ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT (usage_point) DO UPDATE SET "
+                "fetched_at = excluded.fetched_at, customer_id = excluded.customer_id, "
+                "street = excluded.street, locality = excluded.locality, "
+                "postal_code = excluded.postal_code, insee_code = excluded.insee_code, "
+                "city = excluded.city, country = excluded.country, "
+                "latitude = excluded.latitude, longitude = excluded.longitude, "
+                "altitude = excluded.altitude, meter_type = excluded.meter_type, "
+                "usage_point_status = excluded.usage_point_status",
+                (
+                    address.usage_point,
+                    to_unix(at),
+                    address.customer_id,
+                    address.street,
+                    address.locality,
+                    address.postal_code,
+                    address.insee_code,
+                    address.city,
+                    address.country,
+                    address.latitude,
+                    address.longitude,
+                    address.altitude,
+                    address.meter_type,
+                    address.usage_point_status,
+                ),
+            )
+            _forget_failure(conn, address.usage_point, CustomerResource.ADDRESSES)
+
+    def address(self, usage_point: str) -> Address | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT usage_point, customer_id, street, locality, postal_code, insee_code, "
+                "city, country, latitude, longitude, altitude, meter_type, usage_point_status "
+                "FROM address WHERE usage_point = ?",
+                (usage_point,),
+            ).fetchone()
+        if row is None:
+            return None
+        return Address(*row)
+
+    def customer_fetched_at(self, usage_point: str, resource: CustomerResource) -> datetime | None:
+        """When `resource` was last cached for the usage point; None if it never was."""
+        with self._connect() as conn:
+            row = conn.execute(
+                f"SELECT fetched_at FROM {_CUSTOMER_TABLES[resource]} WHERE usage_point = ?",  # noqa: S608 — a fixed table name
+                (usage_point,),
+            ).fetchone()
+        return from_unix(row[0]) if row is not None else None
+
+    def record_customer_failure(
+        self, usage_point: str, resource: CustomerResource, *, at: datetime, detail: str
+    ) -> None:
+        with self._write() as conn:
+            conn.execute(
+                "INSERT INTO customer_failure (usage_point, resource, failed_at, detail) "
+                "VALUES (?, ?, ?, ?) ON CONFLICT (usage_point, resource) DO UPDATE SET "
+                "failed_at = excluded.failed_at, detail = excluded.detail",
+                (usage_point, resource, to_unix(at), detail),
+            )
+
+    def customer_failures(self, usage_point: str) -> dict[CustomerResource, CustomerFailure]:
+        """The customer resources whose last fetch failed, and how."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT resource, failed_at, detail FROM customer_failure WHERE usage_point = ?",
+                (usage_point,),
+            ).fetchall()
+        return {
+            CustomerResource(resource): CustomerFailure(from_unix(at), detail)
+            for resource, at, detail in rows
+        }
+
     # -- Tempo and Ecowatt ----------------------------------------------------------------
     def upsert_tempo(self, days: Iterable[TempoDay]) -> None:
         with self._write() as conn:
@@ -510,6 +751,35 @@ class Store:
                 [(d.day.isoformat(), d.level, d.message) for d in days],
             )
 
+    def upsert_ecowatt_hours(self, hours: Iterable[EcowattHour]) -> None:
+        with self._write() as conn:
+            conn.executemany(
+                "INSERT INTO ecowatt_hour (at, level) VALUES (?, ?) "
+                "ON CONFLICT (at) DO UPDATE SET level = excluded.level",
+                [(to_unix(hour.at), hour.level) for hour in hours],
+            )
+
+    def upsert_tempo_season(self, season: TempoSeason, *, at: datetime) -> None:
+        with self._write() as conn:
+            conn.executemany(
+                "INSERT INTO tempo_season (color, days_left, fetched_at) VALUES (?, ?, ?) "
+                "ON CONFLICT (color) DO UPDATE SET "
+                "days_left = excluded.days_left, fetched_at = excluded.fetched_at",
+                [(color.value, days, to_unix(at)) for color, days in season.days_left.items()],
+            )
+
+    def upsert_tempo_prices(self, prices: Iterable[TempoPrice], *, at: datetime) -> None:
+        with self._write() as conn:
+            conn.executemany(
+                "INSERT INTO tempo_price (color, period, price, fetched_at) VALUES (?, ?, ?, ?) "
+                "ON CONFLICT (color, period) DO UPDATE SET "
+                "price = excluded.price, fetched_at = excluded.fetched_at",
+                [
+                    (price.color.value, price.period.value, str(price.euros_per_kwh), to_unix(at))
+                    for price in prices
+                ],
+            )
+
     def tempo(self, start: date, end: date) -> list[TempoDay]:
         with self._connect() as conn:
             rows = conn.execute(
@@ -526,6 +796,42 @@ class Store:
                 (start.isoformat(), end.isoformat()),
             ).fetchall()
         return [EcowattDay(date.fromisoformat(d), level, msg) for d, level, msg in rows]
+
+    def ecowatt_hours(self, start: datetime, end: datetime) -> list[EcowattHour]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT at, level FROM ecowatt_hour WHERE at >= ? AND at < ? ORDER BY at",
+                (to_unix(start), to_unix(end)),
+            ).fetchall()
+        return [EcowattHour(from_unix(at), level) for at, level in rows]
+
+    def tempo_season(self) -> TempoSeason | None:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT color, days_left FROM tempo_season").fetchall()
+        if not rows:
+            return None
+        return TempoSeason({TempoColor(color): days for color, days in rows})
+
+    def tempo_extras_fetched_at(self) -> datetime | None:
+        """When the Tempo season and prices were last both cached; None if either never was."""
+        with self._connect() as conn:
+            season, prices = conn.execute(
+                "SELECT (SELECT min(fetched_at) FROM tempo_season), "
+                "(SELECT min(fetched_at) FROM tempo_price)"
+            ).fetchone()
+        if season is None or prices is None:
+            return None
+        return from_unix(min(season, prices))
+
+    def tempo_prices(self) -> list[TempoPrice]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT color, period, price FROM tempo_price ORDER BY color, period"
+            ).fetchall()
+        return [
+            TempoPrice(TempoColor(color), Period(period), Decimal(price))
+            for color, period, price in rows
+        ]
 
     # -- export cursors -------------------------------------------------------------------
     def export_cursor(self, sink: str) -> int:
@@ -596,6 +902,42 @@ def _boundary(row: tuple[str, str | None, float, str | None]) -> HaBoundary:
     return HaBoundary(statistic_id, day, base_sum, usage_point)
 
 
+def _consent(
+    row: tuple[str, int, int | None, int | None, int | None, int, int | None, int | None, int, str],
+) -> Consent:
+    (
+        usage_point,
+        valid,
+        expires_at,
+        call_number,
+        quota_limit,
+        quota_reached,
+        quota_reset_at,
+        last_call_at,
+        banned,
+        information,
+    ) = row
+    return Consent(
+        usage_point,
+        bool(valid),
+        from_unix(expires_at) if expires_at is not None else None,
+        call_number,
+        quota_limit,
+        bool(quota_reached),
+        from_unix(quota_reset_at) if quota_reset_at is not None else None,
+        from_unix(last_call_at) if last_call_at is not None else None,
+        bool(banned),
+        information,
+    )
+
+
+def _forget_failure(conn: sqlite3.Connection, usage_point: str, resource: CustomerResource) -> None:
+    conn.execute(
+        "DELETE FROM customer_failure WHERE usage_point = ? AND resource = ?",
+        (usage_point, resource),
+    )
+
+
 def _calls_since(conn: sqlite3.Connection, bucket: str, since: datetime) -> int:
     (used,) = conn.execute(
         "SELECT count(*) FROM gateway_call WHERE bucket = ? AND reserved_at >= ?",
@@ -603,6 +945,13 @@ def _calls_since(conn: sqlite3.Connection, bucket: str, since: datetime) -> int:
     ).fetchone()
     return int(used)
 
+
+_CUSTOMER_TABLES = {
+    CustomerResource.CONTRACT: "contract",
+    CustomerResource.IDENTITY: "identity",
+    CustomerResource.CONTACT: "contact",
+    CustomerResource.ADDRESSES: "address",
+}
 
 _DAYS_WITH_DATA = {
     Dataset.DAILY_CONSUMPTION: (
