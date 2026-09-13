@@ -28,5 +28,6 @@ less data erase what the cache had.
   following passes, within the budget.
 - `releve status`, the dashboard and `/metrics` say how many days are still to
   fetch.
-- A load-curve day counts as present as soon as it holds one point: a day
-  published only partially is not asked for again.
+- A load-curve day counts as present once its curve is a complete grid, or once
+  it is settled: a day published only partially is asked for again for
+  `SETTLE_DAYS`, then kept as it is.

@@ -83,6 +83,36 @@ def test_load_curve_windows_go_newest_first_and_ignore_the_extra_end_day(
     assert cached_days == {TODAY - timedelta(days=n) for n in range(1, 11)}
 
 
+def test_a_recent_partial_curve_is_asked_again_until_complete_but_an_old_one_is_kept(
+    database: Path, store: Store, governor: QuotaGovernor, clock: FrozenClock
+) -> None:
+    recent = TODAY - timedelta(days=2)
+    old = TODAY - timedelta(days=SETTLE_DAYS + 1)
+    settings = make_settings(
+        database,
+        usage_points=[
+            {"id": PDL, "consumption": False, "consumption_detail": True, "contract": False}
+        ],
+        sync={"history_days": 10},
+    )
+    gateway = gateway_for(governor, clock, partial_curves={recent, old})
+
+    run_pass(settings, gateway, store, [], clock)
+    assert backlog(store, PDL, Dataset.CURVE_CONSUMPTION, 10, TODAY) == [recent]
+
+    gateway.partial_curves.clear()
+    gateway.calls.clear()
+    run_pass(settings, gateway, store, [], clock)
+
+    assert gateway.calls == [
+        (PDL, "valid_access", None, None),
+        (PDL, "consumption_load_curve", recent, recent + timedelta(days=1)),
+    ]
+    assert backlog(store, PDL, Dataset.CURVE_CONSUMPTION, 10, TODAY) == []
+    assert len(store.curve(PDL, Direction.CONSUMPTION, recent, recent + timedelta(days=1))) == 48
+    assert len(store.curve(PDL, Direction.CONSUMPTION, old, old + timedelta(days=1))) == 24
+
+
 def test_an_unpublished_yesterday_is_asked_again_until_it_arrives(
     database: Path, store: Store, governor: QuotaGovernor, clock: FrozenClock
 ) -> None:

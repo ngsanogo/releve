@@ -27,6 +27,9 @@ adheres to [Semantic Versioning](https://semver.org/).
   unknown instead of stopping metering.
 
 ### Fixed
+- A load-curve day published only partially was never asked for again, so Home
+  Assistant kept that day as a single total at 23:00. It is now fetched again
+  until its curve is complete or the day is settled (7 days).
 - Daily Ecowatt signals were dated one day early: the gateway keys each day by
   the day before. Days are now dated by their hourly detail, the range asked is
   shifted accordingly, and upgrading moves every cached Ecowatt day — including
