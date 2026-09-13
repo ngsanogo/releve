@@ -6,6 +6,32 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Full MyElectricalData coverage beyond metering: `valid_access` (consent),
+  contracts, identity, contact, addresses, Tempo season and prices, hourly
+  Ecowatt detail, and `DELETE` remote-cache endpoints (`releve purge-cache`).
+- Local cache tables for consent, contract, customer data, Tempo season/prices
+  and hourly Ecowatt; weekly customer refresh; consent checked on every pass that fetches;
+  Tempo season and prices refreshed once a day.
+- Peak/off-peak energy on MQTT when the contract and load curve allow it;
+  JSON API routes for consent/contract/customer/curve/max-power/Tempo extras.
+- Importable Grafana dashboard for InfluxDB in `contrib/grafana/`.
+- `GET /api/v1/rte/ecowatt/hours`: the hourly Ecowatt signal of a range of Paris days.
+- A contract or customer resource the gateway cannot give is asked again a day
+  later rather than on every pass, and shown on the usage point page.
+- Shared load-curve arithmetic (`curve.py`) and tariff helpers (`tariffs.py`).
+
+### Changed
+- Consent: an answer without a readable `valid` or `ban` flag is refused; an
+  unreadable informational field (call count, quota, dates) is logged and left
+  unknown instead of stopping metering.
+
+### Fixed
+- Daily Ecowatt signals were dated one day early: the gateway keys each day by
+  the day before. Days are now dated by their hourly detail, the range asked is
+  shifted accordingly, and upgrading moves every cached Ecowatt day — including
+  those imported from the legacy layout — one day later.
+
 ## [0.1.0] - 2026-09-13
 
 First release.

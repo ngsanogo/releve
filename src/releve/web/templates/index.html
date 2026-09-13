@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-{% if tempo or ecowatt %}
+{% if tempo or ecowatt or tempo_season %}
 <section class="card">
   <h2>Today</h2>
   <dl>
@@ -8,6 +8,10 @@
     <dd>{% if tempo %}<span class="tempo tempo-{{ tempo.color | lower }}">{{ tempo.color }}</span>{% else %}—{% endif %}</dd>
     <dt>Ecowatt</dt>
     <dd>{% if ecowatt %}{{ ecowatt.level }}{% if ecowatt.message %} — {{ ecowatt.message }}{% endif %}{% else %}—{% endif %}</dd>
+    {% if tempo_season %}
+    <dt>Tempo days left</dt>
+    <dd>blue {{ tempo_season['BLUE'] }}, white {{ tempo_season['WHITE'] }}, red {{ tempo_season['RED'] }}</dd>
+    {% endif %}
   </dl>
 </section>
 {% endif %}
@@ -19,6 +23,12 @@
   <dl>
     <dt>Last successful sync</dt>
     <dd>{{ view.last_success | paris }}</dd>
+    <dt>Consent</dt>
+    <dd>{% if view.consent_valid is none %}—{% elif view.consent_valid %}valid{% else %}<span class="failed">invalid</span>{% endif %}</dd>
+    {% if view.contract_tariff %}
+    <dt>Tariff</dt>
+    <dd>{{ view.contract_tariff }}</dd>
+    {% endif %}
     <dt>Gateway calls today</dt>
     <dd>
       {{ view.quota.used }}/{{ budget }}

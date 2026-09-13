@@ -42,8 +42,9 @@ from typing import Any
 from websockets.exceptions import WebSocketException
 from websockets.sync.client import ClientConnection, connect
 
-from releve.clock import PARIS, at_paris_hour, day_end, day_start
+from releve.clock import PARIS, at_paris_hour, day_start
 from releve.config import HomeAssistantSettings, UsagePointSettings
+from releve.curve import day_hours, hourly_energy
 from releve.domain import DailyEnergy, Direction, LoadCurvePoint
 from releve.errors import ExportError
 from releve.store import HaBoundary, Store
@@ -58,7 +59,6 @@ MAX_MESSAGE_BYTES = 64 * 1024 * 1024
 # From this version on, statistic metadata carries `mean_type` and `unit_class`
 # (older versions reject them; 2026.11 stops accepting their absence).
 MEAN_TYPE_SINCE = (2025, 11)
-_ONE_HOUR = timedelta(hours=1)
 _BEGINNING = datetime(2000, 1, 1, tzinfo=UTC)
 
 
@@ -288,40 +288,10 @@ def series_rows(
     return rows
 
 
-def hourly_energy(
-    day: date, points: Sequence[LoadCurvePoint]
-) -> list[tuple[datetime, float]] | None:
-    """Wh per hour of `day` if its curve is a complete regular grid, else None.
-
-    Complete and regular means: N points ending exactly at start + k * step
-    (k = 1..N) with N * step = the day's length (23, 24 or 25 hours) and a
-    step that divides an hour. Anything else would be a guess.
-    """
-    if not points:
-        return None
-    start, end = day_start(day), day_end(day)
-    step = (end - start) / len(points)
-    if step * len(points) != end - start or _ONE_HOUR % step:
-        return None
-    ordered = sorted(points, key=lambda point: point.end)
-    if any(point.end != start + step * k for k, point in enumerate(ordered, start=1)):
-        return None
-    energy: dict[datetime, float] = defaultdict(float)
-    for point in ordered:
-        hour = (point.end - step).astimezone(UTC).replace(minute=0, second=0, microsecond=0)
-        energy[hour] += point.watts * (step / _ONE_HOUR)
-    return sorted(energy.items())
-
-
 def daily_total_hours(day: date, wh: int) -> list[tuple[datetime, float]]:
     """Every hour of `day` at zero, except 23:00 which carries the day's total."""
     stamp = at_paris_hour(day, DAILY_STAMP_HOUR)
-    hours = []
-    hour, end = day_start(day), day_end(day)
-    while hour < end:
-        hours.append((hour, float(wh) if hour == stamp else 0.0))
-        hour += _ONE_HOUR
-    return hours
+    return [(hour, float(wh) if hour == stamp else 0.0) for hour in day_hours(day)]
 
 
 class _Session:

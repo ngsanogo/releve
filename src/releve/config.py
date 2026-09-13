@@ -33,7 +33,7 @@ from pydantic_settings import (
     YamlConfigSettingsSource,
 )
 
-from releve.domain import Dataset
+from releve.domain import CustomerResource, Dataset
 from releve.errors import ConfigError
 
 CONFIG_PATH_ENV = "RELEVE_CONFIG"
@@ -95,6 +95,12 @@ class UsagePointSettings(_Section):
     production: bool = False
     production_detail: bool = False
     max_power: bool = False
+    # Customer endpoints (consent is always checked). Contract unlocks off-peak
+    # splitting; identity/contact/addresses hold PII and stay off by default.
+    contract: bool = True
+    identity: bool = False
+    contact: bool = False
+    addresses: bool = False
 
     @field_validator("id", mode="before")
     @classmethod
@@ -128,11 +134,25 @@ class UsagePointSettings(_Section):
         }
         return tuple(dataset for dataset in Dataset if wanted[dataset])
 
+    @property
+    def customer_resources(self) -> tuple[CustomerResource, ...]:
+        """The contract and customer data to cache."""
+        wanted = {
+            CustomerResource.CONTRACT: self.contract,
+            CustomerResource.IDENTITY: self.identity,
+            CustomerResource.CONTACT: self.contact,
+            CustomerResource.ADDRESSES: self.addresses,
+        }
+        return tuple(resource for resource in CustomerResource if wanted[resource])
+
 
 class SyncSettings(_Section):
     history_days: int = Field(default=365, ge=1, le=1094)
     interval_hours: float = Field(default=4.0, ge=0.5, le=24)
     rte_signals: bool = True
+    # How often to refresh contract / identity / contact / addresses. Consent is
+    # checked on every pass that has something to fetch.
+    customer_refresh_days: int = Field(default=7, ge=1, le=90)
 
 
 class StorageSettings(_Section):

@@ -11,7 +11,8 @@ import pytest
 
 from releve.clock import next_utc_midnight
 from releve.config import GatewaySettings
-from releve.domain import DailyEnergy, Direction
+from releve.curve import hourly_energy
+from releve.domain import DailyEnergy, Direction, TempoColor
 from releve.errors import (
     AuthError,
     GatewayError,
@@ -20,10 +21,13 @@ from releve.errors import (
     ThrottledError,
     WindowRejectedError,
 )
-from releve.exporters.home_assistant import hourly_energy
 from releve.gateway import (
     GatewayClient,
+    parse_consent,
+    parse_contact,
+    parse_contract,
     parse_ecowatt,
+    parse_identity,
     parse_load_curve,
     parse_next_access,
     parse_tempo,
@@ -238,8 +242,9 @@ def test_max_power_and_rte_signals(mock: HttpDouble, client: GatewayClient) -> N
         json=readings(("2026-09-08 19:12:00", "6000")),
     )
     mock.on("/rte/tempo/2026-09-08/2026-09-11", json={"2026-09-09": "white", "2026-09-08": "BLUE"})
+    # The gateway keys Ecowatt days one day early, and filters on that key.
     mock.on(
-        "/rte/ecowatt/2026-09-08/2026-09-11",
+        "/rte/ecowatt/2026-09-07/2026-09-10",
         json={"2026-09-08": {"value": 2, "message": "tendu"}, "2026-09-09": 1},
     )
 
@@ -250,7 +255,12 @@ def test_max_power_and_rte_signals(mock: HttpDouble, client: GatewayClient) -> N
         datetime(2026, 9, 8, 17, 12, tzinfo=UTC),
     )
     assert [(t.day.day, t.color) for t in client.tempo(START, END)] == [(8, "BLUE"), (9, "WHITE")]
-    assert [(e.level, e.message) for e in client.ecowatt(START, END)] == [(2, "tendu"), (1, "")]
+    forecast = client.ecowatt(START, END)
+    assert [(e.day.day, e.level, e.message) for e in forecast.days] == [
+        (9, 2, "tendu"),
+        (10, 1, ""),
+    ]
+    assert forecast.hours == ()
 
 
 @pytest.mark.parametrize("payload", [[], {"2026-09-08": 3}, {"not-a-date": "BLUE"}])
@@ -276,3 +286,217 @@ def test_next_access_time_parsing_does_not_depend_on_the_locale() -> None:
 def test_daily_answers_are_domain_objects(mock: HttpDouble, client: GatewayClient) -> None:
     mock.on(DAILY_PATH, json=readings(("2026-09-08", "1")))
     assert client.daily(PDL, C, START, END) == [DailyEnergy(PDL, C, date(2026, 9, 8), 1)]
+
+
+def test_consent_contract_identity_contact_address_and_tempo_extras(
+    mock: HttpDouble, client: GatewayClient
+) -> None:
+    mock.on(
+        f"/valid_access/{PDL}",
+        json={
+            "valid": True,
+            "information": "",
+            "consent_expiration_date": "2029-09-12T22:04:31",
+            "call_number": 6,
+            "quota_reached": False,
+            "quota_limit": 50,
+            "quota_reset_at": "2026-09-13T23:59:59.999999",
+            "last_call": "2026-06-21T11:57:27.051689",
+            "ban": False,
+        },
+    )
+    mock.on(
+        f"/contracts/{PDL}",
+        json={
+            "customer": {
+                "customer_id": "cust",
+                "usage_points": [
+                    {
+                        "usage_point": {
+                            "usage_point_id": PDL,
+                            "usage_point_status": "COM",
+                            "meter_type": "TCB",
+                        },
+                        "contracts": {
+                            "segment": "C5",
+                            "subscribed_power": "9 kVA",
+                            "last_activation_date": "2019-07-16+02:00",
+                            "distribution_tariff": "BTINFCU4",
+                            "offpeak_hours": "HC (0H50-6H50;14H20-16H20)",
+                            "contract_status": "SERVC",
+                            "last_distribution_tariff_change_date": "2024-03-17+01:00",
+                        },
+                    }
+                ],
+            }
+        },
+    )
+    mock.on(
+        f"/identity/{PDL}",
+        json={
+            "customer_id": "cust",
+            "identity": {"natural_person": {"title": "M", "firstname": "Ada", "lastname": "L"}},
+        },
+    )
+    mock.on(
+        f"/contact/{PDL}",
+        json={"customer_id": "cust", "contact_data": {"phone": "0102030405", "email": "a@b.c"}},
+    )
+    mock.on(
+        f"/addresses/{PDL}",
+        json={
+            "customer": {
+                "customer_id": "cust",
+                "usage_points": [
+                    {
+                        "usage_point": {
+                            "usage_point_id": PDL,
+                            "usage_point_status": "COM",
+                            "meter_type": "TCB",
+                            "usage_point_addresses": {
+                                "street": "1 rue",
+                                "locality": None,
+                                "postal_code": "75002",
+                                "insee_code": "75102",
+                                "city": "Paris",
+                                "country": "France",
+                                "geo_points": {},
+                            },
+                        }
+                    }
+                ],
+            }
+        },
+    )
+    mock.on(
+        "/edf/tempo/price",
+        json={
+            "red_hc": "0.1615",
+            "red_hp": "0.7295",
+            "blue_hc": "0.1356",
+            "blue_hp": "0.1654",
+            "white_hc": "0.1536",
+            "white_hp": "0.1921",
+        },
+    )
+    mock.on("/edf/tempo/days", json={"red": 22, "blue": 287, "white": 43})
+
+    consent = client.valid_access(PDL)
+    assert consent.valid
+    assert consent.call_number == 6
+    contract = client.contract(PDL)
+    assert contract.offpeak_hours is not None
+    assert "0H50" in contract.offpeak_hours
+    assert client.identity(PDL).firstname == "Ada"
+    assert client.contact(PDL).email == "a@b.c"
+    assert client.addresses(PDL).city == "Paris"
+    prices = client.tempo_prices()
+    assert len(prices) == 6
+    season = client.tempo_season()
+    assert season.days_left[TempoColor.BLUE] == 287
+
+
+def test_ecowatt_days_are_dated_from_hourly_detail() -> None:
+    payload = {
+        "2026-09-12": {
+            "value": 1,
+            "message": "ok",
+            "detail": {"2026-09-13 00:00:00": 1, "2026-09-13 01:00:00": 0},
+        }
+    }
+    forecast = parse_ecowatt(payload, "/rte/ecowatt")
+    assert forecast.days[0].day == date(2026, 9, 13)
+    assert [hour.at for hour in forecast.hours] == [
+        datetime(2026, 9, 12, 22, tzinfo=UTC),
+        datetime(2026, 9, 12, 23, tzinfo=UTC),
+    ]
+
+
+def test_ecowatt_hours_across_the_clock_changes_never_share_an_instant() -> None:
+    def day_of_hours(day: str) -> dict[str, int]:
+        return {f"{day} {hour:02d}:00:00": hour for hour in range(24)}
+
+    payload = {
+        "2027-03-27": {"value": 1, "message": "", "detail": day_of_hours("2027-03-28")},
+        "2027-10-30": {"value": 1, "message": "", "detail": day_of_hours("2027-10-31")},
+    }
+    forecast = parse_ecowatt(payload, "/rte/ecowatt")
+
+    instants = [hour.at for hour in forecast.hours]
+    assert len(instants) == len(set(instants)) == 23 + 24  # no 02:00 on 28 March
+    assert 2 not in {hour.level for hour in forecast.hours if hour.at.month == 3}
+    assert [day.day for day in forecast.days] == [date(2027, 3, 28), date(2027, 10, 31)]
+
+
+def test_delete_cache_counts_and_hits_the_right_path(
+    mock: HttpDouble, client: GatewayClient, governor: QuotaGovernor
+) -> None:
+    from releve.domain import CacheResource
+
+    mock.on(f"/cache/{PDL}", method="DELETE", json={"status": "ok"})
+    client.delete_cache(PDL, CacheResource.ALL)
+    assert mock.calls(f"/cache/{PDL}", method="DELETE") == 1
+    assert governor.usage(PDL).used == 1
+
+
+def test_customer_answers_may_wrap_the_holder_and_never_mix_meters() -> None:
+    wrapped = {
+        "customer": {
+            "customer_id": "cust",
+            "identity": {"natural_person": {"title": "M", "firstname": "Ada", "lastname": "L"}},
+            "contact_data": {"phone": "0102030405", "email": "a@b.c"},
+        }
+    }
+    assert parse_identity(wrapped, PDL, "/identity").firstname == "Ada"
+    assert parse_contact(wrapped, PDL, "/contact").email == "a@b.c"
+
+    other_meter = {
+        "customer": {
+            "usage_points": [{"usage_point": {"usage_point_id": "99999999999999"}, "contracts": {}}]
+        }
+    }
+    with pytest.raises(GatewayError, match="not in answer"):
+        parse_contract(other_meter, PDL, "/contracts")
+
+
+@pytest.mark.parametrize(("raw", "banned"), [(False, False), ("false", False), ("true", True)])
+def test_consent_flags_sent_as_text_are_read_as_booleans(raw: object, banned: bool) -> None:
+    assert parse_consent({"valid": "true", "ban": raw}, PDL, "/valid_access").banned is banned
+
+
+@pytest.mark.parametrize(
+    "payload", [{}, {"valid": None}, {"valid": "maybe"}, {"valid": True, "ban": "perhaps"}]
+)
+def test_consent_without_a_readable_decision_is_refused(payload: dict[str, object]) -> None:
+    with pytest.raises(GatewayError):
+        parse_consent(payload, PDL, "/valid_access")
+
+
+def test_unreadable_informational_consent_fields_are_left_unknown(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    consent = parse_consent(
+        {
+            "valid": True,
+            "ban": False,
+            "call_number": "6",
+            "quota_limit": 12.5,
+            "quota_reached": "soon",
+            "consent_expiration_date": "next year",
+        },
+        PDL,
+        "/valid_access",
+    )
+
+    assert consent.granted
+    assert consent.call_number == 6
+    assert (consent.quota_limit, consent.quota_reached, consent.expires_at) == (None, False, None)
+    assert caplog.text.count("ignoring an unreadable informational field") == 3
+
+
+def test_delete_cache_accepts_no_content(mock: HttpDouble, client: GatewayClient) -> None:
+    from releve.domain import CacheResource
+
+    mock.on(f"/identity/{PDL}/cache", method="DELETE", status=204)
+    client.delete_cache(PDL, CacheResource.IDENTITY)
+    assert mock.calls(f"/identity/{PDL}/cache", method="DELETE") == 1

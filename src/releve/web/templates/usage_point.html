@@ -2,6 +2,59 @@
 {% block title %}{{ usage_point.label }} — releve{% endblock %}
 {% block content %}
 <h1>{{ usage_point.label }} <code>{{ usage_point.id }}</code></h1>
+
+{% if consent or contract %}
+<section class="card">
+  <h2>Meter</h2>
+  <dl>
+    {% if consent %}
+    <dt>Consent</dt>
+    <dd>{% if consent.granted %}valid{% else %}<span class="failed">invalid</span>{% endif %}{% if consent.expires_at %} — expires {{ consent.expires_at | paris }}{% endif %}</dd>
+    {% endif %}
+    {% if contract %}
+    <dt>Subscribed power</dt>
+    <dd>{{ contract.subscribed_power or "—" }}</dd>
+    <dt>Tariff</dt>
+    <dd>{{ contract.distribution_tariff or "—" }}</dd>
+    <dt>Off-peak hours</dt>
+    <dd>{{ contract.offpeak_hours or "—" }}</dd>
+    {% endif %}
+  </dl>
+</section>
+{% endif %}
+
+{% if identity or contact or address %}
+<section class="card">
+  <h2>Customer</h2>
+  <dl>
+    {% if identity %}
+    <dt>Identity</dt>
+    <dd>{{ identity.title or "" }} {{ identity.firstname or "" }} {{ identity.lastname or "" }}</dd>
+    {% endif %}
+    {% if contact %}
+    <dt>Contact</dt>
+    <dd>{{ contact.email or "—" }}{% if contact.phone %} / {{ contact.phone }}{% endif %}</dd>
+    {% endif %}
+    {% if address %}
+    <dt>Address</dt>
+    <dd>{{ address.street or "" }}{% if address.postal_code %}, {{ address.postal_code }}{% endif %} {{ address.city or "" }}</dd>
+    {% endif %}
+  </dl>
+</section>
+{% endif %}
+
+{% if customer_failures %}
+<section class="card">
+  <h2>Not available</h2>
+  <dl>
+    {% for resource, failure in customer_failures | dictsort %}
+    <dt>{{ resource }}</dt>
+    <dd><span class="failed">{{ failure.detail }}</span> — {{ failure.failed_at | paris }}</dd>
+    {% endfor %}
+  </dl>
+</section>
+{% endif %}
+
 <h2>Last {{ rows | length }} days</h2>
 <div class="table">
   <table>

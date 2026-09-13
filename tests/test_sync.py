@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from releve.domain import Dataset, Direction
-from releve.errors import ExportError, SyncAlreadyRunningError
+from releve.domain import Contract, CustomerResource, Dataset, Direction, Identity
+from releve.errors import ExportError, SyncAlreadyRunningError, WindowRejectedError
 from releve.planning import SETTLE_DAYS
 from releve.quota import QuotaGovernor
 from releve.store import Store
@@ -48,11 +48,14 @@ def test_first_pass_fills_the_history_then_nothing_is_asked(
     report = run_pass(settings, gateway, store, [], clock)
 
     assert report.ok
-    assert gateway.calls == [(PDL, "daily_consumption", TODAY - timedelta(days=30), TODAY)]
+    assert gateway.calls == [
+        (PDL, "valid_access", None, None),
+        (PDL, "daily_consumption", TODAY - timedelta(days=30), TODAY),
+    ]
     assert len(store.daily(PDL, Direction.CONSUMPTION, date.min, date.max)) == 30
     gateway.calls.clear()
     assert run_pass(settings, gateway, store, [], clock).ok
-    assert gateway.calls == []
+    assert gateway.calls == []  # an idle pass does not even check consent
 
 
 def test_load_curve_windows_go_newest_first_and_ignore_the_extra_end_day(
@@ -60,14 +63,19 @@ def test_load_curve_windows_go_newest_first_and_ignore_the_extra_end_day(
 ) -> None:
     settings = make_settings(
         database,
-        usage_points=[{"id": PDL, "consumption": False, "consumption_detail": True}],
+        usage_points=[
+            {"id": PDL, "consumption": False, "consumption_detail": True, "contract": False}
+        ],
         sync={"history_days": 10},
     )
     gateway = gateway_for(governor, clock)
 
     run_pass(settings, gateway, store, [], clock)
 
-    assert [(start, end) for _, _, start, end in gateway.calls] == [
+    metering = [
+        (start, end) for _, endpoint, start, end in gateway.calls if "load_curve" in endpoint
+    ]
+    assert metering == [
         (TODAY - timedelta(days=7), TODAY),
         (TODAY - timedelta(days=10), TODAY - timedelta(days=7)),
     ]
@@ -87,7 +95,10 @@ def test_an_unpublished_yesterday_is_asked_again_until_it_arrives(
     gateway.published_until = TODAY
     gateway.calls.clear()
     run_pass(settings, gateway, store, [], clock)
-    assert gateway.calls == [(PDL, "daily_consumption", TODAY - timedelta(days=1), TODAY)]
+    assert gateway.calls == [
+        (PDL, "valid_access", None, None),
+        (PDL, "daily_consumption", TODAY - timedelta(days=1), TODAY),
+    ]
     assert backlog(store, PDL, Dataset.DAILY_CONSUMPTION, 5, TODAY) == []
 
 
@@ -112,8 +123,8 @@ def test_a_spent_budget_stops_one_usage_point_and_never_the_others(
     settings = make_settings(
         database,
         usage_points=[
-            {"id": PDL, "consumption_detail": True},
-            {"id": OTHER_PDL},
+            {"id": PDL, "consumption_detail": True, "contract": False},
+            {"id": OTHER_PDL, "contract": False},
         ],
         sync={"history_days": 60},
     )
@@ -135,8 +146,8 @@ def test_a_throttle_or_a_refused_token_stops_only_that_usage_point(
     settings = make_settings(
         database,
         usage_points=[
-            {"id": PDL, "consumption_detail": True, "max_power": True},
-            {"id": OTHER_PDL},
+            {"id": PDL, "consumption_detail": True, "max_power": True, "contract": False},
+            {"id": OTHER_PDL, "contract": False},
         ],
         sync={"history_days": 3},
     )
@@ -157,7 +168,10 @@ def test_an_unreachable_gateway_costs_one_call_per_usage_point(
     database: Path, store: Store, governor: QuotaGovernor, clock: FrozenClock
 ) -> None:
     settings = make_settings(
-        database, usage_points=[{"id": PDL, "consumption_detail": True, "max_power": True}]
+        database,
+        usage_points=[
+            {"id": PDL, "consumption_detail": True, "max_power": True, "contract": False}
+        ],
     )
     gateway = gateway_for(governor, clock, unreachable=True)
 
@@ -166,6 +180,128 @@ def test_an_unreachable_gateway_costs_one_call_per_usage_point(
     assert not outcome.ok
     assert "no answer" in outcome.detail
     assert governor.usage(PDL).used == 1
+
+
+def test_invalid_consent_stops_metering_without_further_calls(
+    database: Path, store: Store, governor: QuotaGovernor, clock: FrozenClock
+) -> None:
+    settings = make_settings(database, sync={"history_days": 5})
+    gateway = gateway_for(governor, clock, consent_valid=False)
+
+    (outcome,) = run_pass(settings, gateway, store, [], clock).outcomes
+
+    assert not outcome.ok
+    assert "consent refused" in outcome.detail
+    assert gateway.calls == [(PDL, "valid_access", None, None)]
+    assert store.daily(PDL, Direction.CONSUMPTION, date.min, date.max) == []
+
+
+def test_contract_is_refreshed_when_due(
+    database: Path, store: Store, governor: QuotaGovernor, clock: FrozenClock
+) -> None:
+    settings = make_settings(
+        database,
+        usage_points=[{"id": PDL, "contract": True}],
+        sync={"history_days": 1, "customer_refresh_days": 7},
+    )
+    gateway = gateway_for(governor, clock)
+
+    run_pass(settings, gateway, store, [], clock)
+    assert any(endpoint == "contracts" for _, endpoint, _, _ in gateway.calls)
+    assert store.contract(PDL) is not None
+    gateway.calls.clear()
+    run_pass(settings, gateway, store, [], clock)
+    assert all(endpoint != "contracts" for _, endpoint, _, _ in gateway.calls)
+    clock.advance(timedelta(days=7))
+    gateway.calls.clear()
+    run_pass(settings, gateway, store, [], clock)
+    assert any(endpoint == "contracts" for _, endpoint, _, _ in gateway.calls)
+
+
+def test_a_failing_customer_resource_does_not_block_the_others(
+    database: Path, store: Store, governor: QuotaGovernor, clock: FrozenClock
+) -> None:
+    settings = make_settings(
+        database,
+        usage_points=[{"id": PDL, "contract": True, "addresses": True}],
+        sync={"history_days": 1},
+    )
+    gateway = gateway_for(governor, clock)
+
+    def refused(usage_point: str) -> Contract:
+        del usage_point
+        raise WindowRejectedError("contracts: the gateway refused the window (HTTP 404)")
+
+    gateway.contract = refused  # type: ignore[method-assign]
+    (outcome,) = run_pass(settings, gateway, store, [], clock).outcomes
+
+    assert not outcome.ok
+    assert store.address(PDL) is not None
+    assert store.daily(PDL, Direction.CONSUMPTION, date.min, date.max) != []
+
+
+def test_a_failing_customer_resource_is_asked_again_a_day_later_not_every_pass(
+    database: Path, store: Store, governor: QuotaGovernor, clock: FrozenClock
+) -> None:
+    settings = make_settings(
+        database,
+        usage_points=[{"id": PDL, "contract": True, "identity": True}],
+        sync={"history_days": 1, "interval_hours": 4},
+    )
+    gateway = gateway_for(governor, clock)
+
+    def refused(usage_point: str) -> Identity:
+        gateway.calls.append((usage_point, "identity", None, None))
+        raise WindowRejectedError("identity: the gateway refused the window (HTTP 404)")
+
+    gateway.identity = refused  # type: ignore[method-assign]
+    (first,) = run_pass(settings, gateway, store, [], clock).outcomes
+    assert not first.ok
+    assert "refused" in store.customer_failures(PDL)[CustomerResource.IDENTITY].detail
+
+    for _ in range(5):  # the rest of the day: nothing is due, nothing is asked
+        clock.advance(timedelta(hours=4))
+        gateway.calls.clear()
+        (outcome,) = run_pass(settings, gateway, store, [], clock).outcomes
+        assert outcome.ok
+        assert all(endpoint != "identity" for _, endpoint, _, _ in gateway.calls)
+
+    clock.advance(timedelta(hours=4))
+    gateway.calls.clear()
+    del gateway.identity  # the gateway gives the identity again
+    (retried,) = run_pass(settings, gateway, store, [], clock).outcomes
+    assert retried.ok
+    assert (PDL, "identity", None, None) in gateway.calls
+    assert store.customer_failures(PDL) == {}
+    assert store.identity(PDL) is not None
+
+
+def test_a_quota_refusal_is_not_recorded_against_a_customer_resource(
+    database: Path, store: Store, clock: FrozenClock
+) -> None:
+    governor = QuotaGovernor(store, daily_budget=1, clock=clock)
+    settings = make_settings(database, usage_points=[{"id": PDL, "contract": True}])
+
+    (outcome,) = run_pass(settings, gateway_for(governor, clock), store, [], clock).outcomes
+
+    assert not outcome.ok
+    assert "daily budget spent" in outcome.detail
+    assert store.customer_failures(PDL) == {}
+
+
+def test_tempo_season_and_prices_are_fetched_once_a_day(
+    database: Path, store: Store, governor: QuotaGovernor, clock: FrozenClock
+) -> None:
+    settings = make_settings(database, sync={"history_days": 1, "rte_signals": True})
+    gateway = gateway_for(governor, clock)
+    extras = {"edf_tempo_days", "edf_tempo_price"}
+
+    run_pass(settings, gateway, store, [], clock)
+    assert extras <= {endpoint for _, endpoint, _, _ in gateway.calls}
+    gateway.calls.clear()
+    run_pass(settings, gateway, store, [], clock)
+    assert not extras & {endpoint for _, endpoint, _, _ in gateway.calls}
+    assert store.tempo_season() is not None
 
 
 def test_rte_signals_are_fetched_only_when_enabled(
@@ -183,7 +319,8 @@ def test_rte_signals_are_fetched_only_when_enabled(
         clock,
     )
     assert store.tempo(TODAY, TODAY + timedelta(days=1))[0].color == "BLUE"
-    assert store.ecowatt(TODAY, TODAY + timedelta(days=1))[0].level == 1
+    ecowatt = store.ecowatt(date.min, date.max)
+    assert [day.day for day in ecowatt] == [TODAY + timedelta(days=n) for n in range(-1, 4)]
 
 
 def test_every_outcome_is_journaled(
@@ -231,7 +368,9 @@ def test_a_refused_window_of_settled_days_becomes_gaps_and_others_go_on(
 ) -> None:
     settings = make_settings(
         database,
-        usage_points=[{"id": PDL, "consumption": False, "consumption_detail": True}],
+        usage_points=[
+            {"id": PDL, "consumption": False, "consumption_detail": True, "contract": False}
+        ],
         sync={"history_days": 30},
     )
     old_window_start = TODAY - timedelta(days=21)
@@ -250,7 +389,9 @@ def test_a_refused_recent_window_is_reported_after_the_others(
 ) -> None:
     settings = make_settings(
         database,
-        usage_points=[{"id": PDL, "consumption": False, "consumption_detail": True}],
+        usage_points=[
+            {"id": PDL, "consumption": False, "consumption_detail": True, "contract": False}
+        ],
         sync={"history_days": 14},
     )
     gateway = gateway_for(governor, clock, refused_windows={TODAY - timedelta(days=7)})
