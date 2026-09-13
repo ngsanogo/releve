@@ -69,6 +69,7 @@ class FakeGateway:
     clock: Clock
     published_until: date
     holes: set[date] = field(default_factory=set)
+    partial_curves: set[date] = field(default_factory=set)  # served with half their points
     throttled_curves: bool = False
     refused_usage_points: set[str] = field(default_factory=set)
     unreachable: bool = False
@@ -162,7 +163,13 @@ class FakeGateway:
             raise ThrottledError("load curve: throttled upstream", retry_at)
         # Quirk observed live: the answer also covers the `end` day.
         served = self._available(start, end + timedelta(days=1))
-        return [point for day in served for point in curve_of(usage_point, direction, day)]
+        points = []
+        for day in served:
+            day_points = curve_of(usage_point, direction, day)
+            if day in self.partial_curves:
+                day_points = day_points[: len(day_points) // 2]
+            points += day_points
+        return points
 
     def max_power(self, usage_point: str, start: date, end: date) -> list[PowerPeak]:
         self._charge(usage_point, "daily_consumption_max_power", start, end)

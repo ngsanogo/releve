@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import fcntl
 import logging
+from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -27,7 +28,8 @@ from typing import assert_never
 
 from releve.clock import Clock, paris_today, utc_now
 from releve.config import Settings, UsagePointSettings
-from releve.domain import CustomerResource, Dataset, Direction
+from releve.curve import intervals
+from releve.domain import CustomerResource, Dataset, Direction, LoadCurvePoint
 from releve.errors import (
     AuthError,
     ExportError,
@@ -272,11 +274,29 @@ def _due(fetched_at: datetime | None, now: datetime, refresh_after: timedelta) -
 def backlog(
     store: Store, usage_point: str, dataset: Dataset, history_days: int, today: date
 ) -> list[date]:
-    """The days of the history window still to fetch, newest first."""
+    """The days of the history window still to fetch, newest first.
+
+    A load-curve day is fetched once its curve is a complete grid, or once it is
+    settled: Enedis may publish a day's curve partially and complete it later,
+    and until then Home Assistant only gets that day's total, at 23:00.
+    """
     start = history_start(today, dataset, history_days)
     known = store.days_with_data(usage_point, dataset, start, today)
+    if dataset.is_curve:
+        unsettled = max(start, today - timedelta(days=SETTLE_DAYS - 1))
+        known -= incomplete_curve_days(store, usage_point, _DIRECTION[dataset], unsettled, today)
     known |= store.confirmed_gaps(usage_point, dataset, start, today)
     return missing_days(start, today, known)
+
+
+def incomplete_curve_days(
+    store: Store, usage_point: str, direction: Direction, start: date, end: date
+) -> set[date]:
+    """Days in [start, end) holding load-curve points that do not form a complete grid."""
+    by_day: dict[date, list[LoadCurvePoint]] = defaultdict(list)
+    for point in store.curve(usage_point, direction, start, end):
+        by_day[point.day].append(point)
+    return {day for day, points in by_day.items() if intervals(day, points) is None}
 
 
 def sync_dataset(
