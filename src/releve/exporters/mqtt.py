@@ -32,9 +32,10 @@ from paho.mqtt.reasoncodes import ReasonCode
 
 from releve.clock import Clock, paris_today, utc_now
 from releve.config import MqttSettings, UsagePointSettings
-from releve.domain import Dataset, Direction
+from releve.domain import Dataset, Direction, Period, TempoColor
 from releve.errors import ExportError
 from releve.store import Store
+from releve.tariffs import OffpeakHours, daily_energy_by_period
 
 TIMEOUT_SECONDS = 10.0
 
@@ -180,6 +181,25 @@ class MqttExporter:
 def state(store: Store, up: UsagePointSettings, today: date) -> dict[str, Any]:
     """The JSON state of one usage point."""
     payload: dict[str, Any] = {}
+    if consent := store.consent(up.id):
+        payload |= {
+            "consent_valid": consent.valid,
+            "consent_banned": consent.banned,
+            "consent_expires_at": consent.expires_at.isoformat() if consent.expires_at else None,
+            "quota_reached": consent.quota_reached,
+            "quota_limit": consent.quota_limit,
+            "call_number": consent.call_number,
+        }
+    if contract := store.contract(up.id):
+        payload |= {
+            "subscribed_power": contract.subscribed_power,
+            "distribution_tariff": contract.distribution_tariff,
+            "offpeak_hours": contract.offpeak_hours,
+            "contract_status": contract.contract_status,
+            "meter_type": contract.meter_type,
+        }
+        if up.consumption_detail and contract.offpeak_hours:
+            payload |= _period_totals(store, up.id, today, contract.offpeak_hours)
     if up.consumption:
         by_day = _daily_by_day(store, up.id, Direction.CONSUMPTION, today)
         payload |= {
@@ -206,11 +226,37 @@ def rte_state(store: Store, today: date) -> dict[str, Any]:
     tomorrow = today + timedelta(days=1)
     tempo = store.tempo(today, tomorrow)
     ecowatt = store.ecowatt(today, tomorrow)
+    season = store.tempo_season()
+    prices = {
+        f"{price.color.value.lower()}_{price.period.value}": float(price.euros_per_kwh)
+        for price in store.tempo_prices()
+    }
     return {
         "day": today.isoformat(),
         "tempo_today": tempo[0].color if tempo else None,
         "ecowatt_today": ecowatt[0].level if ecowatt else None,
         "ecowatt_message": ecowatt[0].message if ecowatt else None,
+        "tempo_days_left_blue": season.days_left.get(TempoColor.BLUE) if season else None,
+        "tempo_days_left_white": season.days_left.get(TempoColor.WHITE) if season else None,
+        "tempo_days_left_red": season.days_left.get(TempoColor.RED) if season else None,
+        "tempo_prices": prices or None,
+    }
+
+
+def _period_totals(
+    store: Store, pdl: str, today: date, offpeak_hours: str
+) -> dict[str, float | None]:
+    offpeak = OffpeakHours.parse(offpeak_hours)
+    yesterday = today - timedelta(days=1)
+    if offpeak is None:
+        return {"energy_yesterday_peak_kwh": None, "energy_yesterday_offpeak_kwh": None}
+    points = store.curve(pdl, Direction.CONSUMPTION, yesterday, today)
+    totals = daily_energy_by_period(yesterday, points, offpeak)
+    if totals is None:
+        return {"energy_yesterday_peak_kwh": None, "energy_yesterday_offpeak_kwh": None}
+    return {
+        "energy_yesterday_peak_kwh": round(totals[Period.PEAK] / 1000, 3),
+        "energy_yesterday_offpeak_kwh": round(totals[Period.OFFPEAK] / 1000, 3),
     }
 
 

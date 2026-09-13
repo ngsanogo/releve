@@ -25,12 +25,29 @@ def config(tmp_path: Path, history_days: int = 3) -> Path:
     path = tmp_path / "config.yaml"
     path.write_text(
         "gateway:\n  token: test-token\n  prefer_cache: false\n"
-        f'usage_points:\n  - id: "{PDL}"\n'
+        f'usage_points:\n  - id: "{PDL}"\n    contract: false\n'
         f"sync:\n  history_days: {history_days}\n  rte_signals: false\n"
         f"storage:\n  path: {tmp_path / 'cache.db'}\n",
         encoding="utf-8",
     )
     return path
+
+
+def allow_consent(gateway: HttpDouble) -> None:
+    gateway.on(
+        f"/valid_access/{PDL}",
+        json={
+            "valid": True,
+            "information": "",
+            "consent_expiration_date": "2029-01-01T00:00:00",
+            "call_number": 1,
+            "quota_reached": False,
+            "quota_limit": 50,
+            "quota_reset_at": "2026-09-13T23:59:59",
+            "last_call": None,
+            "ban": False,
+        },
+    )
 
 
 @pytest.fixture
@@ -82,19 +99,22 @@ def test_sync_then_status(
             ]
         }
     }
+    allow_consent(gateway)
     gateway.on(f"/daily_consumption/{PDL}/start/{start}/end/{end}", json=payload)
     assert main(["sync", "-c", str(path)]) == EXIT_OK
-    assert f"✔ {PDL}: daily_consumption +3" in capsys.readouterr().out
+    assert f"✔ {PDL}: consent ok, daily_consumption +3" in capsys.readouterr().out
 
     assert main(["status", "-c", str(path)]) == EXIT_OK
     out = capsys.readouterr().out
-    assert "calls today  : 1/45" in out
+    assert "calls today  : 2/45" in out
+    assert "consent      : valid" in out
     assert f"daily_consumption : newest {end - timedelta(days=1)}, 0 days still to fetch" in out
 
 
 def test_a_failing_sync_exits_1_and_a_busy_one_exits_3(tmp_path: Path, gateway: HttpDouble) -> None:
     path = config(tmp_path, history_days=1)
     start = TODAY - timedelta(days=1)
+    allow_consent(gateway)
     gateway.on(f"/daily_consumption/{PDL}/start/{start}/end/{TODAY}", status=403, json={})
     assert main(["sync", "-c", str(path)]) == EXIT_FAILURES
     Store.open(tmp_path / "cache.db")

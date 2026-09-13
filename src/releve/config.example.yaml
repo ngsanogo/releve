@@ -18,11 +18,16 @@ usage_points:
     production: false       # daily production
     production_detail: false
     max_power: false        # daily maximum apparent power
+    contract: true          # distribution contract (off-peak hours, subscribed power)
+    identity: false         # account holder name (PII)
+    contact: false          # phone / email (PII)
+    addresses: false        # meter address
 
 sync:
   history_days: 365         # days kept complete in the cache (load curve: at most 729)
   interval_hours: 4         # Enedis publishes once a day; more often only catches up sooner
-  rte_signals: true         # Tempo colors and Ecowatt signals
+  rte_signals: true         # Tempo colors, Ecowatt, Tempo season and prices
+  customer_refresh_days: 7  # how often to refresh contract / identity / contact / addresses
 
 # storage:
 #   path: /absolute/path/to/releve.db   # default: ~/.local/state/releve/releve.db

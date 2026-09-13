@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from releve.domain import Direction
+from releve.domain import Direction, EcowattDay
 from releve.errors import QuotaExhaustedError, StoreError
 from releve.quota import QuotaGovernor
 from releve.store import HaBoundary, Store, migrations
@@ -114,7 +114,8 @@ def test_a_legacy_database_is_migrated_in_place_with_a_backup(
     (peak,) = store.peaks(LEGACY_PDL, date.min, date.max)
     assert peak.at == datetime(2026, 8, 28, 17, 12, tzinfo=UTC)
     assert store.tempo(date.min, date.max)[0].color == "BLUE"
-    assert store.ecowatt(date.min, date.max)[0].level == 1
+    # The legacy layout dated Ecowatt by the gateway's key, one day early.
+    assert store.ecowatt(date.min, date.max) == [EcowattDay(date(2026, 9, 13), 1, "ok")]
     (event,) = store.recent_events(5)
     assert event.subject == "migration"
     assert "ha_boundary 1" in event.detail

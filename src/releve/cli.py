@@ -6,6 +6,7 @@
     releve status        freshness, backlog, quota and exports
     releve serve         the daemon: a sync pass every interval, plus the web interface
     releve ha-boundary   show or set where Home Assistant series begin
+    releve purge-cache   delete MyElectricalData's remote cache for a usage point
     releve version
 
 The configuration file is `--config`, else `$RELEVE_CONFIG`, else
@@ -20,6 +21,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import re
 import sys
 from collections.abc import Callable, Sequence
 from datetime import date, timedelta
@@ -35,7 +37,8 @@ from releve.config import (
     load_settings,
     resolve_config_path,
 )
-from releve.errors import ConfigError, StoreError, SyncAlreadyRunningError
+from releve.domain import CacheResource
+from releve.errors import ConfigError, GatewayError, StoreError, SyncAlreadyRunningError
 from releve.exporters import build_exporters
 from releve.exporters.home_assistant import SINK_PREFIX as HA_SINK_PREFIX
 from releve.gateway import GatewayClient
@@ -112,6 +115,28 @@ def _parser() -> argparse.ArgumentParser:
     )
     boundary.set_defaults(handler=_ha_boundary)
 
+    purge = commands.add_parser(
+        "purge-cache",
+        parents=[common],
+        help="delete MyElectricalData's remote cache for a usage point",
+        description=(
+            "Asks MyElectricalData to drop its encrypted 30-day cache for a resource. "
+            "Counts against the daily quota. The local SQLite cache is never touched."
+        ),
+    )
+    purge.add_argument("usage_point", help="14-digit PDL")
+    purge.add_argument(
+        "--resource",
+        default=CacheResource.ALL.value,
+        choices=[resource.value for resource in CacheResource],
+        help="what to delete (default: all)",
+    )
+    purge.add_argument(
+        "--start", type=date.fromisoformat, help="inclusive start for dated resources"
+    )
+    purge.add_argument("--end", type=date.fromisoformat, help="exclusive end for dated resources")
+    purge.set_defaults(handler=_purge_cache)
+
     commands.add_parser("version", help="print the version").set_defaults(
         handler=lambda _: _print_version()
     )
@@ -157,7 +182,9 @@ def _check(args: argparse.Namespace) -> int:
     )
     for up in settings.usage_points:
         datasets = ", ".join(up.datasets) or "nothing enabled"
-        print(f"usage point   : {up.id} ({up.label}): {datasets}")
+        customer = ", ".join(up.customer_resources)
+        extra = f"; customer: {customer}" if customer else ""
+        print(f"usage point   : {up.id} ({up.label}): {datasets}{extra}")
     exporters = settings.exporters
     destinations = [
         f"mqtt → {exporters.mqtt.host}:{exporters.mqtt.port}" if exporters.mqtt.enabled else "",
@@ -197,6 +224,16 @@ def _status(args: argparse.Namespace) -> int:
     for up in settings.usage_points:
         print(f"{up.id} ({up.label})")
         print(f"  last success : {format_paris(successes.get(up.id))}")
+        consent = store.consent(up.id)
+        if consent is not None:
+            state = "valid" if consent.granted else "invalid"
+            print(f"  consent      : {state}, expires {format_paris(consent.expires_at)}")
+        contract = store.contract(up.id)
+        if contract is not None:
+            print(
+                f"  contract     : {contract.distribution_tariff or '—'}, "
+                f"{contract.subscribed_power or '—'}, {contract.offpeak_hours or 'no HC'}"
+            )
         _print_quota(governor, up.id)
         for dataset in up.datasets:
             latest = store.latest_day(up.id, dataset)
@@ -276,6 +313,27 @@ def _ha_boundary(args: argparse.Namespace) -> int:
         )
     if not boundaries:
         print("no boundary pinned yet — the first export pins one per series")
+    return EXIT_OK
+
+
+def _purge_cache(args: argparse.Namespace) -> int:
+    settings = _settings(args).require_runnable()
+    if not re.fullmatch(r"\d{14}", args.usage_point):
+        raise ConfigError(f"{args.usage_point!r} is not a 14-digit PDL")
+    resource = CacheResource(args.resource)
+    if resource.needs_dates and (args.start is None or args.end is None):
+        raise ConfigError(f"{resource}: --start and --end are required")
+    if not resource.needs_dates and (args.start is not None or args.end is not None):
+        raise ConfigError(f"{resource}: does not take a date range")
+    store = Store.open(settings.storage.path)
+    governor = QuotaGovernor(store, settings.gateway.daily_call_budget)
+    with GatewayClient(settings.gateway, governor) as gateway:
+        try:
+            gateway.delete_cache(args.usage_point, resource, start=args.start, end=args.end)
+        except GatewayError as exc:
+            print(f"✘ {exc}", file=sys.stderr)
+            return EXIT_FAILURES
+    print(f"✔ purged remote cache {resource} for {args.usage_point}")
     return EXIT_OK
 
 

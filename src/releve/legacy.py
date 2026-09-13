@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 import sqlite3
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from releve.clock import PARIS, to_unix
 from releve.domain import Direction, LoadCurvePoint
@@ -183,15 +183,20 @@ def _ecowatt(conn: sqlite3.Connection) -> int:
     if not _exists(conn, "legacy_ecowatt_day"):
         return 0
     rows = conn.execute("SELECT day, value, message FROM legacy_ecowatt_day").fetchall()
+    # The legacy layout dated each signal by the gateway's day key, one day early.
     conn.executemany(
         "INSERT INTO ecowatt_day (day, level, message) VALUES (?, ?, ?)",
-        [(_day(day), value, message or "") for day, value, message in rows],
+        [(_next_day(day), value, message or "") for day, value, message in rows],
     )
     return len(rows)
 
 
 def _day(value: str) -> str:
     return date.fromisoformat(value[:10]).isoformat()
+
+
+def _next_day(value: str) -> str:
+    return (date.fromisoformat(value[:10]) + timedelta(days=1)).isoformat()
 
 
 def _paris(value: str) -> datetime:

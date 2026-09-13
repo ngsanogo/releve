@@ -14,12 +14,12 @@ from websockets.sync.server import ServerConnection, serve
 
 from releve.clock import at_paris_hour, day_start
 from releve.config import HomeAssistantSettings, UsagePointSettings
+from releve.curve import hourly_energy
 from releve.domain import DailyEnergy, Direction, LoadCurvePoint
 from releve.errors import ExportError
 from releve.exporters.home_assistant import (
     HomeAssistantExporter,
     daily_total_hours,
-    hourly_energy,
     series_rows,
 )
 from releve.store import HaBoundary, Store

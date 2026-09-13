@@ -125,7 +125,11 @@ writing to your statistics, a Home Assistant backup beforehand is a good habit.
 days still to fetch, quota, exports and the journal. It also serves:
 
 - `GET /api/v1/usage-points/{pdl}/daily?start=YYYY-MM-DD&end=YYYY-MM-DD[&direction=production]`
-- `GET /api/v1/rte/tempo?start=…&end=…` and `GET /api/v1/rte/ecowatt?start=…&end=…`
+- `GET /api/v1/usage-points/{pdl}/curve?start=…&end=…[&direction=]`
+- `GET /api/v1/usage-points/{pdl}/max-power?start=…&end=…`
+- `GET /api/v1/usage-points/{pdl}/consent|contract|identity|contact|address` — customer data only
+  while enabled for the usage point
+- `GET /api/v1/rte/tempo?start=…&end=…`, `/ecowatt`, `/ecowatt/hours`, `/tempo/season`, `/tempo/prices`
 - `GET /metrics` (Prometheus) — `releve_last_success_timestamp_seconds` is the one to alert on
 - `GET /healthz` — 503 when the database is unusable, the scheduler stalled or the last pass crashed
 
@@ -133,6 +137,9 @@ It listens on `127.0.0.1` by default (`0.0.0.0` inside the container, where the
 published port decides). Set `web.auth_token` to require a token on every route
 but `/healthz` — as a Bearer token, or as the password of HTTP Basic
 authentication so browsers work too.
+
+An importable Grafana dashboard for the Influx exporter lives in
+[`contrib/grafana/releve-influx.json`](contrib/grafana/releve-influx.json).
 
 ## Command line
 
@@ -143,6 +150,7 @@ releve sync          run one sync pass now
 releve status        freshness, days still to fetch, quota, exports
 releve serve         the daemon and the web interface
 releve ha-boundary   show or set Home Assistant series boundaries
+releve purge-cache   delete MyElectricalData's remote cache for a PDL
 releve version
 ```
 
