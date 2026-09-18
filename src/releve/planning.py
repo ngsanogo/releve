@@ -1,9 +1,10 @@
 """What to ask the gateway for — pure functions, no I/O.
 
 A usage point's history window is kept COMPLETE, not merely extended: every
-day in it that holds no data is fetched, newest first, until the gateway has
-either delivered it or confirmed — long enough after the fact — that it has
-nothing for that day.
+day in it that is still to fetch is asked for, newest first, until the gateway
+has either delivered it or confirmed — long enough after the fact — that it has
+nothing for that day. For the load curve, "still to fetch" also covers recent
+days whose cached points do not yet form a complete grid (see `curve.py`).
 """
 
 from __future__ import annotations
