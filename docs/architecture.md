@@ -37,7 +37,7 @@ cli                            composition root
 | `legacy.py` | One-way import of a database in the earlier SQLAlchemy layout |
 | `quota.py` | `QuotaGovernor`: reserve before sending, settle after, honor blocks |
 | `gateway.py` | The only HTTP to the gateway, and the parsing of its answers |
-| `curve.py` | Complete-grid load-curve arithmetic; shared by store, sync and exporters |
+| `curve.py` | Load-curve arithmetic, one series day at a time: complete grids, energy per interval |
 | `tariffs.py` | Off-peak hours from the contract; energy split by period |
 | `planning.py` | Missing days, fetch windows, settled gaps — pure functions |
 | `sync.py` | One pass; the pass lock; the journal; exporter cursors |
@@ -57,9 +57,11 @@ cli                            composition root
 3. **All datetimes are aware.** Instants are stored as unix seconds (UTC); Paris
    civil days as ISO dates. Load-curve points are stamped at the END of their
    interval: a point ending at midnight belongs to the day before.
-4. **The cache is the source of truth.** Answers are upserted, never used to
-   delete. A row carries the id of the run that last changed it; exporters
-   deliver the changes after their cursor and advance it only on success.
+4. **The cache is the source of truth.** Answers are upserted; one holding
+   less never erases what the cache has, and a load-curve day only ever gets
+   better. A row carries the id of the run that last changed it, and a dropped
+   load-curve point is journaled with the run that dropped it; exporters deliver
+   the changes after their cursor and advance it only on success.
 5. **One pass at a time per database**, across processes, with an advisory
    lock next to the database file.
 6. **Errors are typed and journaled.** A pass records one outcome per subject
@@ -78,3 +80,4 @@ The ADRs record why things are the way they are:
 - [0006 — Home Assistant series: pinned boundary, hourly rows](adr/0006-home-assistant-series.md)
 - [0007 — A small, synchronous runtime](adr/0007-small-synchronous-runtime.md)
 - [0008 — Hand-rolled Prometheus exposition](adr/0008-hand-rolled-prometheus.md)
+- [0009 — Partially published load-curve days](adr/0009-partial-load-curve-days.md)

@@ -6,9 +6,9 @@
 * A sync pass is a *run*. Every metering row carries the id of the run that
   last CHANGED it, which is how exporters find what is new since they last
   delivered.
-* Metering data is upserted: an incomplete answer cannot make the cache forget.
-  A load-curve answer that is itself a complete grid replaces that day's points,
-  so an earlier irregular answer cannot keep the day incomplete forever.
+* Metering data is upserted: an answer holding less cannot make the cache
+  forget. A load-curve day only ever gets better (`upsert_curve`), and the
+  points it drops on the way are journaled so exporters can drop them too.
 * Each operation opens its own short-lived connection, so web threads, the
   scheduler thread and a concurrent CLI process never share one.
 """
@@ -19,7 +19,6 @@ import fcntl
 import logging
 import re
 import sqlite3
-from collections import defaultdict
 from collections.abc import Iterable, Iterator
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
@@ -30,7 +29,7 @@ from pathlib import Path
 
 from releve import legacy
 from releve.clock import Clock, from_unix, to_unix, utc_now
-from releve.curve import intervals
+from releve.curve import SeriesDay, grid_step, split_days
 from releve.domain import (
     Address,
     Consent,
@@ -371,41 +370,22 @@ class Store:
             return conn.total_changes - before
 
     def upsert_curve(self, run_id: int, points: Iterable[LoadCurvePoint]) -> int:
-        """Insert or update load-curve points; returns how many rows actually changed.
+        """Cache load-curve points, one series day at a time; returns how many rows changed.
 
-        An incomplete answer is merged in and never erases a fuller day. When the
-        points of a day form a complete grid, that day's prior rows are replaced
-        first: otherwise an irregular earlier answer could keep `intervals` failing
-        forever even after a good answer arrives.
+        A day's curve only ever gets better:
+        * an answer that is not a complete grid is merged into a day that is not
+          one either, and never touches a complete day;
+        * a complete answer replaces the day, unless the day already holds a finer
+          complete grid: a coarser grid can be a subset of the finer one that
+          happens to tile the day, and its values would be wrong for its step.
+        Replacing drops the cached points that are not on the new grid. They are
+        journaled in `load_curve_removed`, like changed rows are stamped with the run.
         """
-        material = list(points)
-        by_day: dict[tuple[str, Direction, date], list[LoadCurvePoint]] = defaultdict(list)
-        for point in material:
-            by_day[(point.usage_point, point.direction, point.day)].append(point)
-        replace = [
-            (usage_point, direction, day)
-            for (usage_point, direction, day), day_points in by_day.items()
-            if intervals(day, day_points) is not None
-        ]
         with self._write() as conn:
-            before = conn.total_changes
-            for usage_point, direction, day in replace:
-                conn.execute(
-                    "DELETE FROM load_curve WHERE usage_point = ? AND direction = ? AND day = ?",
-                    (usage_point, direction, day.isoformat()),
-                )
-            conn.executemany(
-                "INSERT INTO load_curve (usage_point, direction, end_at, day, watts, run_id) "
-                "VALUES (?, ?, ?, ?, ?, ?) "
-                "ON CONFLICT (usage_point, direction, end_at) "
-                "DO UPDATE SET watts = excluded.watts, run_id = excluded.run_id "
-                "WHERE load_curve.watts IS NOT excluded.watts",
-                [
-                    (p.usage_point, p.direction, to_unix(p.end), p.day.isoformat(), p.watts, run_id)
-                    for p in material
-                ],
+            return sum(
+                _cache_curve_day(conn, key, answer, run_id)
+                for key, answer in split_days(points).items()
             )
-            return conn.total_changes - before
 
     def upsert_peaks(self, run_id: int, peaks: Iterable[PowerPeak]) -> int:
         """Insert or update daily power peaks; returns how many rows actually changed."""
@@ -492,7 +472,10 @@ class Store:
     def earliest_changed_day(
         self, usage_point: str, direction: Direction, *, after_run: int, up_to_run: int
     ) -> date | None:
-        """The oldest day whose daily energy or load curve changed in (after_run, up_to_run]."""
+        """The oldest day whose daily energy or load curve changed in (after_run, up_to_run].
+
+        A load-curve point dropped from the cache is a change of its day too.
+        """
         with self._connect() as conn:
             (day,) = conn.execute(
                 "SELECT min(day) FROM ("
@@ -501,8 +484,11 @@ class Store:
                 "  UNION ALL"
                 "  SELECT day FROM load_curve WHERE usage_point = ? AND direction = ?"
                 "    AND run_id > ? AND run_id <= ?"
+                "  UNION ALL"
+                "  SELECT day FROM load_curve_removed WHERE usage_point = ? AND direction = ?"
+                "    AND run_id > ? AND run_id <= ?"
                 ")",
-                (usage_point, direction, after_run, up_to_run) * 2,
+                (usage_point, direction, after_run, up_to_run) * 3,
             ).fetchone()
         return date.fromisoformat(day) if day is not None else None
 
@@ -521,6 +507,16 @@ class Store:
         with self._connect() as conn:
             rows = conn.execute(
                 "SELECT usage_point, direction, end_at, watts FROM load_curve "
+                "WHERE run_id > ? AND run_id <= ? ORDER BY usage_point, direction, end_at",
+                (after_run, up_to_run),
+            ).fetchall()
+        return [LoadCurvePoint(up, Direction(d), from_unix(e), w) for up, d, e, w in rows]
+
+    def removed_curve(self, *, after_run: int, up_to_run: int) -> list[LoadCurvePoint]:
+        """The load-curve points dropped from the cache in (after_run, up_to_run], as they were."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT usage_point, direction, end_at, watts FROM load_curve_removed "
                 "WHERE run_id > ? AND run_id <= ? ORDER BY usage_point, direction, end_at",
                 (after_run, up_to_run),
             ).fetchall()
@@ -951,6 +947,74 @@ def _consent(
         from_unix(last_call_at) if last_call_at is not None else None,
         bool(banned),
         information,
+    )
+
+
+def _cache_curve_day(
+    conn: sqlite3.Connection, key: SeriesDay, answer: list[LoadCurvePoint], run_id: int
+) -> int:
+    """`Store.upsert_curve` for one series day; returns how many rows changed."""
+    cached = _curve_day(conn, key)
+    cached_step, answer_step = grid_step(key.day, cached), grid_step(key.day, answer)
+    if cached_step is not None:  # a complete day only changes for a grid at least as fine
+        if answer_step is None:
+            return 0
+        if answer_step > cached_step:
+            log.warning(
+                "%s %s %s: kept the cached %s grid over a coarser answer (%s)",
+                *key,
+                cached_step,
+                answer_step,
+            )
+            return 0
+    before = conn.total_changes
+    conn.executemany(
+        "INSERT INTO load_curve (usage_point, direction, end_at, day, watts, run_id) "
+        "VALUES (?, ?, ?, ?, ?, ?) "
+        "ON CONFLICT (usage_point, direction, end_at) "
+        "DO UPDATE SET watts = excluded.watts, run_id = excluded.run_id "
+        "WHERE load_curve.watts IS NOT excluded.watts",
+        [_curve_row(point, run_id) for point in answer],
+    )
+    changed = conn.total_changes - before
+    if answer_step is None:
+        return changed
+    on_grid = {point.end for point in answer}
+    dropped = [point for point in cached if point.end not in on_grid]
+    if not dropped:
+        return changed
+    log.warning("%s %s %s: dropped %d points that are not on the day's grid", *key, len(dropped))
+    conn.executemany(
+        "DELETE FROM load_curve WHERE usage_point = ? AND direction = ? AND end_at = ?",
+        [(point.usage_point, point.direction, to_unix(point.end)) for point in dropped],
+    )
+    conn.executemany(
+        "INSERT INTO load_curve_removed (usage_point, direction, end_at, day, watts, run_id) "
+        "VALUES (?, ?, ?, ?, ?, ?) "
+        "ON CONFLICT (usage_point, direction, end_at) DO UPDATE SET "
+        "day = excluded.day, watts = excluded.watts, run_id = excluded.run_id",
+        [_curve_row(point, run_id) for point in dropped],
+    )
+    return changed + len(dropped)
+
+
+def _curve_day(conn: sqlite3.Connection, key: SeriesDay) -> list[LoadCurvePoint]:
+    rows = conn.execute(
+        "SELECT end_at, watts FROM load_curve "
+        "WHERE usage_point = ? AND direction = ? AND day = ? ORDER BY end_at",
+        (key.usage_point, key.direction, key.day.isoformat()),
+    ).fetchall()
+    return [LoadCurvePoint(key.usage_point, key.direction, from_unix(e), w) for e, w in rows]
+
+
+def _curve_row(point: LoadCurvePoint, run_id: int) -> tuple[str, str, int, str, int, int]:
+    return (
+        point.usage_point,
+        point.direction,
+        to_unix(point.end),
+        point.day.isoformat(),
+        point.watts,
+        run_id,
     )
 
 

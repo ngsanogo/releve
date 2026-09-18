@@ -9,6 +9,8 @@ The rules a pass lives by:
   usage point without burning the rest of the budget;
 * a customer resource the gateway cannot give is asked again a day later, not
   on every pass;
+* a load-curve day published only partially is asked again until it is settled,
+  but only inside a call made for a missing day, and past the gateway's cache;
 * every answer is cached before any exporter runs; exporters read the cache
   from where they last stopped, so a failed delivery is retried, not lost;
 * every outcome, success or failure, is journaled.
@@ -170,12 +172,13 @@ def sync_usage_point(
     clock: Clock = utc_now,
 ) -> Outcome:
     now = clock()
+    history_days = settings.sync.history_days
     customer_due = due_customer_resources(usage_point, settings, store, now)
-    metering_due = any(
-        backlog(store, usage_point.id, dataset, settings.sync.history_days, today)
+    todo = {
+        dataset: backlog(store, usage_point.id, dataset, history_days, today)
         for dataset in usage_point.datasets
-    )
-    if not customer_due and not metering_due:
+    }
+    if not customer_due and not any(todo.values()):
         return Outcome(usage_point.id, True, "nothing to fetch")  # an idle pass asks nothing
 
     try:
@@ -197,10 +200,10 @@ def sync_usage_point(
         detail = "; ".join(filter(None, [", ".join(changes), *problems]))
         return Outcome(usage_point.id, False, detail)
 
-    for dataset in usage_point.datasets:
+    for dataset, missing in todo.items():
         try:
             changed = sync_dataset(
-                usage_point.id, dataset, settings.sync.history_days, gateway, store, run_id, today
+                usage_point.id, dataset, missing, history_days, gateway, store, run_id, today
             )
         except (RetryLaterError, AuthError, GatewayUnreachableError) as exc:
             problems.append(str(exc))
@@ -275,46 +278,63 @@ def backlog(
 ) -> list[date]:
     """The days of the history window still to fetch, newest first.
 
-    A load-curve day counts as present once its curve is a complete grid, or
-    once it is settled: Enedis may publish a day partially and complete it
-    later, and until then Home Assistant only gets that day's total, at 23:00.
+    A day is still to fetch while it holds no data and is not a confirmed gap.
     """
     start = history_start(today, dataset, history_days)
     known = store.days_with_data(usage_point, dataset, start, today)
-    if dataset.is_curve:
-        unsettled = max(start, today - timedelta(days=SETTLE_DAYS - 1))
-        known -= incomplete_days(store.curve(usage_point, _DIRECTION[dataset], unsettled, today))
     known |= store.confirmed_gaps(usage_point, dataset, start, today)
     return missing_days(start, today, known)
+
+
+def partial_days(
+    store: Store, usage_point: str, dataset: Dataset, history_days: int, today: date
+) -> set[date]:
+    """The unsettled days of a load-curve dataset whose curve is not a complete grid yet.
+
+    Enedis may publish a curve day partially and complete it later. Such a day is
+    worth asking for again, but not worth a call: it rides along in the windows
+    of the missing days — and each new day brings one, yesterday. Once settled,
+    an incomplete day is kept as it is.
+    """
+    if not dataset.is_curve:
+        return set()
+    unsettled = today - timedelta(days=SETTLE_DAYS - 1)
+    start = max(history_start(today, dataset, history_days), unsettled)
+    return incomplete_days(store.curve(usage_point, _DIRECTION[dataset], start, today))
 
 
 def sync_dataset(
     usage_point: str,
     dataset: Dataset,
+    missing: Sequence[date],
     history_days: int,
     gateway: Gateway,
     store: Store,
     run_id: int,
     today: date,
 ) -> int:
-    """Fetch every missing day of `dataset`; returns how many cached rows changed.
+    """Fetch the `missing` days of `dataset` (see `backlog`); returns how many cached rows changed.
 
-    A window the gateway explicitly refuses is skipped: when all its days are
-    settled (typically before the meter's activation or beyond what Enedis
-    keeps), they become confirmed gaps; otherwise the refusal is raised once
-    the other windows are done.
+    Partial load-curve days ride along (see `partial_days`). A window holding one
+    skips the gateway's cache: its copy of that day may be the same partial answer.
+
+    A window the gateway explicitly refuses is skipped: when all the missing days
+    it holds are settled (typically before the meter's activation or beyond what
+    Enedis keeps), they become confirmed gaps; otherwise the refusal is raised
+    once the other windows are done.
     """
-    missing = backlog(store, usage_point, dataset, history_days, today)
+    partial = partial_days(store, usage_point, dataset, history_days, today) if missing else set()
     changed = 0
     refused: WindowRejectedError | None = None
-    for start, end in plan_windows(missing, dataset.window_days):
+    for start, end in plan_windows(missing, dataset.window_days, refresh=partial):
         asked = [day for day in missing if start <= day < end]
+        use_cache = not any(start <= day < end for day in partial)
         try:
             delivered, window_changes = _fetch_window(
-                dataset, usage_point, start, end, gateway, store, run_id
+                dataset, usage_point, start, end, gateway, store, run_id, use_cache=use_cache
             )
         except WindowRejectedError as exc:
-            if end - timedelta(days=1) > today - timedelta(days=SETTLE_DAYS):
+            if max(asked) > today - timedelta(days=SETTLE_DAYS):
                 refused = exc
                 continue
             delivered, window_changes = set(), 0
@@ -333,11 +353,14 @@ def _fetch_window(
     gateway: Gateway,
     store: Store,
     run_id: int,
+    *,
+    use_cache: bool,
 ) -> tuple[set[date], int]:
     """Fetch [start, end), cache what falls inside it; return the days delivered and rows changed.
 
     Answers are clamped to the window because the gateway sometimes returns more
     than asked (observed live: the load curve includes the `end` day).
+    `use_cache` only matters to the load curve, the one dataset with partial days.
     """
     match dataset:
         case Dataset.DAILY_CONSUMPTION | Dataset.DAILY_PRODUCTION:
@@ -345,7 +368,9 @@ def _fetch_window(
             daily = [reading for reading in answer if start <= reading.day < end]
             return {reading.day for reading in daily}, store.upsert_daily(run_id, daily)
         case Dataset.CURVE_CONSUMPTION | Dataset.CURVE_PRODUCTION:
-            answer_curve = gateway.load_curve(usage_point, _DIRECTION[dataset], start, end)
+            answer_curve = gateway.load_curve(
+                usage_point, _DIRECTION[dataset], start, end, use_cache=use_cache
+            )
             points = [point for point in answer_curve if start <= point.day < end]
             return {point.day for point in points}, store.upsert_curve(run_id, points)
         case Dataset.MAX_POWER:

@@ -14,7 +14,6 @@ from websockets.sync.server import ServerConnection, serve
 
 from releve.clock import at_paris_hour, day_start
 from releve.config import HomeAssistantSettings, UsagePointSettings
-from releve.curve import hourly_energy, incomplete_days
 from releve.domain import DailyEnergy, Direction, LoadCurvePoint
 from releve.errors import ExportError
 from releve.exporters.home_assistant import (
@@ -32,43 +31,6 @@ SERIES = f"releve:{PDL}_consumption"
 
 
 # -- arithmetic -------------------------------------------------------------------------
-@pytest.mark.parametrize(
-    ("day", "hours"), [(DAY, 24), (date(2026, 3, 29), 23), (date(2026, 10, 25), 25)]
-)
-def test_a_complete_curve_gives_one_value_per_hour_of_the_day(day: date, hours: int) -> None:
-    points = curve_of(PDL, C, day)
-    energy = hourly_energy(day, points)
-    assert energy is not None
-    assert len(energy) == hours
-    assert energy[0][0] == day_start(day)
-    assert sum(wh for _, wh in energy) == sum(p.watts * 0.5 for p in points)
-
-
-def test_an_incomplete_or_irregular_curve_is_not_guessed() -> None:
-    points = curve_of(PDL, C, DAY)
-    assert hourly_energy(DAY, []) is None
-    assert hourly_energy(DAY, points[:-1]) is None  # a point missing
-    shifted = [*points[:-1], LoadCurvePoint(PDL, C, points[-1].end - timedelta(minutes=10), 1)]
-    assert hourly_energy(DAY, shifted) is None  # right count, wrong grid
-    hourly = [
-        LoadCurvePoint(PDL, C, day_start(DAY) + timedelta(hours=h), 1000) for h in range(1, 25)
-    ]
-    assert hourly_energy(DAY, hourly) == [
-        (day_start(DAY) + timedelta(hours=h), 1000.0) for h in range(24)
-    ]
-    two = [LoadCurvePoint(PDL, C, day_start(DAY) + timedelta(hours=12 * k), 1) for k in (1, 2)]
-    assert hourly_energy(DAY, two) is None  # a 12-hour step does not divide an hour
-
-
-def test_incomplete_days_names_only_the_days_whose_curve_is_not_a_grid() -> None:
-    complete = date(2026, 9, 10)
-    partial = date(2026, 9, 11)
-    points = curve_of(PDL, C, complete) + curve_of(PDL, C, partial)[:24]
-    assert incomplete_days(points) == {partial}
-    assert incomplete_days(curve_of(PDL, C, complete)) == set()
-    assert incomplete_days([]) == set()
-
-
 def test_a_day_without_a_complete_curve_lands_at_23_00() -> None:
     hours = daily_total_hours(DAY, 9100)
     assert len(hours) == 24
@@ -275,6 +237,30 @@ def test_only_the_changed_tail_is_rewritten(
     assert len(latest) == 24
     assert latest[0]["start"] == day_start(DAY + timedelta(days=2)).isoformat()
     assert latest[-1]["sum"] == 15.0
+
+
+def test_a_day_whose_curve_became_a_grid_by_dropping_a_point_is_rewritten_hourly(
+    home_assistant: FakeHomeAssistant, store: Store
+) -> None:
+    complete = curve_of(PDL, C, DAY)
+    orphan = LoadCurvePoint(PDL, C, day_start(DAY) + timedelta(minutes=10), 999)
+    first = cache_days(store, DAY)
+    store.upsert_curve(first, [orphan, *complete])  # not a grid: the day lands at 23:00
+    exporter = exporter_for(home_assistant)
+    exporter.export(store, after_run=0, up_to_run=first)
+    assert home_assistant.imports()[-1]["stats"][0]["sum"] == 0.0
+
+    second = store.start_run(NOW)
+    store.upsert_curve(second, complete)  # nothing changes but the orphan, dropped
+    exporter.export(store, after_run=first, up_to_run=second)
+
+    stats = home_assistant.imports()[-1]["stats"]
+    first_hour = sum(point.watts * 0.5 for point in complete[:2]) / 1000
+    assert stats[0] == {
+        "start": day_start(DAY).isoformat(),
+        "state": round(first_hour, 3),
+        "sum": round(first_hour, 3),
+    }
 
 
 def test_days_without_data_inside_the_owned_span_stay_flat(

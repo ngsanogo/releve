@@ -108,7 +108,13 @@ class Gateway(Protocol):
     ) -> list[DailyEnergy]: ...
 
     def load_curve(
-        self, usage_point: str, direction: Direction, start: date, end: date
+        self,
+        usage_point: str,
+        direction: Direction,
+        start: date,
+        end: date,
+        *,
+        use_cache: bool = True,
     ) -> list[LoadCurvePoint]: ...
 
     def max_power(self, usage_point: str, start: date, end: date) -> list[PowerPeak]: ...
@@ -204,11 +210,22 @@ class GatewayClient:
         return parse_daily(payload, usage_point, direction, path)
 
     def load_curve(
-        self, usage_point: str, direction: Direction, start: date, end: date
+        self,
+        usage_point: str,
+        direction: Direction,
+        start: date,
+        end: date,
+        *,
+        use_cache: bool = True,
     ) -> list[LoadCurvePoint]:
+        """The load curve of the Paris days [start, end).
+
+        `use_cache=False` bypasses the gateway's cache even when `prefer_cache` is
+        set: its copy of a day Enedis published partially may be that partial day.
+        """
         endpoint = f"{direction}_load_curve"
         path = f"/{endpoint}/{usage_point}/start/{start}/end/{end}"
-        payload = self._get(usage_point, endpoint, path, cacheable=True)
+        payload = self._get(usage_point, endpoint, path, cacheable=use_cache)
         return parse_load_curve(payload, usage_point, direction, path)
 
     def max_power(self, usage_point: str, start: date, end: date) -> list[PowerPeak]:

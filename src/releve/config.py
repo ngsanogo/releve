@@ -292,6 +292,12 @@ class Settings(BaseSettings):
         ha = self.exporters.home_assistant
         if ha.enabled and not ha.token.get_secret_value():
             raise ValueError("exporters.home_assistant.token is required when enabled")
+        if ha.enabled:
+            for index, up in enumerate(self.usage_points):
+                if up.consumption_detail and not up.consumption:
+                    raise ValueError(_needs_daily_totals(index, "consumption"))
+                if up.production_detail and not up.production:
+                    raise ValueError(_needs_daily_totals(index, "production"))
         if ha.statistic_id == ha.production_statistic_id:
             raise ValueError("consumption and production need different statistic ids")
         if len(ids) > 1:
@@ -309,6 +315,14 @@ class Settings(BaseSettings):
         if not self.usage_points:
             raise ConfigError("usage_points is empty — declare at least one PDL")
         return self
+
+
+def _needs_daily_totals(index: int, direction: str) -> str:
+    return (
+        f"usage_points[{index}]: {direction}_detail needs {direction}: true with "
+        f"exporters.home_assistant — a day whose load curve is incomplete is exported "
+        f"from its daily total"
+    )
 
 
 def resolve_config_path(cli_path: Path | None) -> tuple[Path, bool]:
