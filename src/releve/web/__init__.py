@@ -4,6 +4,8 @@ The web layer never talks to the gateway.
 
     GET /                                   dashboard
     GET /usage-points/{pdl}                 the last 31 days of one usage point
+    GET /api/v1/usage-points                the configured usage points and their freshness
+    GET /api/v1/usage-points/{pdl}/state    today's published state (as on MQTT)
     GET /api/v1/usage-points/{pdl}/daily    ?start=YYYY-MM-DD&end=YYYY-MM-DD[&direction=]
     GET /api/v1/usage-points/{pdl}/consent
     GET /api/v1/usage-points/{pdl}/contract
@@ -12,6 +14,7 @@ The web layer never talks to the gateway.
     GET /api/v1/usage-points/{pdl}/address
     GET /api/v1/usage-points/{pdl}/curve    ?start=&end=&direction=
     GET /api/v1/usage-points/{pdl}/max-power ?start=&end=
+    GET /api/v1/rte/state                   today's Tempo and Ecowatt (as on MQTT); 404 if disabled
     GET /api/v1/rte/tempo                   ?start=&end=
     GET /api/v1/rte/ecowatt                 ?start=&end=
     GET /api/v1/rte/ecowatt/hours           ?start=&end=  (the hours of those Paris days)
@@ -55,6 +58,7 @@ from releve.domain import Dataset, Direction
 from releve.metrics import render_metrics
 from releve.quota import RTE_BUCKET, QuotaGovernor
 from releve.scheduler import Scheduler
+from releve.state import rte_state, state
 from releve.store import QuotaUsage, Store
 from releve.sync import backlog
 
@@ -173,6 +177,31 @@ def create_app(
             },
         }
         return templates.TemplateResponse(request, "usage_point.html", context)
+
+    def api_usage_points(request: Request) -> Response:
+        del request
+        successes = store.last_success()
+        return JSONResponse(
+            [
+                {
+                    "id": up.id,
+                    "name": up.name,
+                    "datasets": [dataset.value for dataset in up.datasets],
+                    "last_success": _iso(successes.get(up.id)),
+                }
+                for up in settings.usage_points
+            ]
+        )
+
+    def api_state(request: Request) -> Response:
+        up = _known_usage_point(request, usage_points)
+        return JSONResponse(state(store, up, paris_today(clock())))
+
+    def api_rte_state(request: Request) -> Response:
+        del request
+        if not settings.sync.rte_signals:
+            raise HTTPException(404, "grid signals are disabled (sync.rte_signals)")
+        return JSONResponse(rte_state(store, paris_today(clock())))
 
     def api_daily(request: Request) -> Response:
         up = _known_usage_point(request, usage_points)
@@ -314,6 +343,8 @@ def create_app(
     routes = [
         Route("/", dashboard),
         Route("/usage-points/{pdl}", usage_point_page),
+        Route("/api/v1/usage-points", api_usage_points),
+        Route("/api/v1/usage-points/{pdl}/state", api_state),
         Route("/api/v1/usage-points/{pdl}/daily", api_daily),
         Route("/api/v1/usage-points/{pdl}/curve", api_curve),
         Route("/api/v1/usage-points/{pdl}/max-power", api_max_power),
@@ -322,6 +353,7 @@ def create_app(
         Route("/api/v1/usage-points/{pdl}/identity", api_identity),
         Route("/api/v1/usage-points/{pdl}/contact", api_contact),
         Route("/api/v1/usage-points/{pdl}/address", api_address),
+        Route("/api/v1/rte/state", api_rte_state),
         Route("/api/v1/rte/tempo", api_tempo),
         Route("/api/v1/rte/ecowatt", api_ecowatt),
         Route("/api/v1/rte/ecowatt/hours", api_ecowatt_hours),
@@ -396,6 +428,10 @@ def _date_range(request: Request) -> tuple[date, date]:
     if (end - start).days > MAX_RANGE_DAYS:
         raise HTTPException(400, f"ranges are limited to {MAX_RANGE_DAYS} days")
     return start, end
+
+
+def _iso(moment: datetime | None) -> str | None:
+    return moment.isoformat() if moment is not None else None
 
 
 def _public(payload: dict[str, object]) -> dict[str, object]:
