@@ -28,6 +28,7 @@ flowchart LR
     DB --> MQ[MQTT + discovery]
     DB --> IN[InfluxDB / VictoriaMetrics]
     DB --> W[web page, JSON API, /metrics]
+    W --> HACS[HACS integration]
 ```
 
 - **The quota is never overspent.** Each gateway call is reserved in the
@@ -68,7 +69,7 @@ docker compose up -d             # see docker-compose.yaml
 Or with Python 3.12+:
 
 ```bash
-uv tool install git+https://github.com/ngsanogo/releve@v0.1.0
+uv tool install git+https://github.com/ngsanogo/releve@v0.2.0
 releve init                      # writes ~/.config/releve/config.yaml
 $EDITOR ~/.config/releve/config.yaml   # set gateway.token and your PDL
 releve check                     # explains the configuration
@@ -207,7 +208,7 @@ uv run ruff format --check src tests custom_components tests_ha
 uv run mypy                      # strict
 
 # The Home Assistant integration, in its own environment (Home Assistant pins its libraries):
-uv venv --python 3.14 .venv-ha && uv pip install --python .venv-ha -r tests_ha/requirements.txt
+uv venv --python 3.14 --allow-existing .venv-ha && uv pip install --python .venv-ha -r tests_ha/requirements.txt
 .venv-ha/bin/python -m mypy --config-file tests_ha/mypy.ini custom_components/releve
 (cd tests_ha && ../.venv-ha/bin/python -m pytest)
 uvx pre-commit install           # optional: ruff and gitleaks before each commit

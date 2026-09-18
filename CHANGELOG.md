@@ -6,6 +6,25 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Load-curve points dropped from the cache are journaled (schema version 3).
+  Home Assistant rewrites their day, and the InfluxDB exporter deletes them
+  through `/api/v2/delete`. A destination without that endpoint, such as
+  VictoriaMetrics, is reported in the export summary.
+
+### Changed
+- Partially published load-curve days ride along in windows planned for missing
+  days: they cost no call of their own, skip the gateway's cache, and no longer
+  count among the days still to fetch in `releve status`, the dashboard and
+  `/metrics` ([ADR 0009](docs/adr/0009-partial-load-curve-days.md)).
+- A day's cached load curve only ever gets better: an answer that is not a
+  complete grid never touches a complete day, a coarser grid never replaces a
+  finer one, and fetching an unchanged day again changes and exports nothing.
+- With the Home Assistant exporter enabled, a configuration with
+  `consumption_detail` but not `consumption`, or `production_detail` but not
+  `production`, is refused. A day whose load curve is incomplete is exported
+  from its daily total; without one, it was exported as 0 kWh.
+
 ## [0.2.0] - 2026-09-18
 
 ### Added
@@ -31,30 +50,19 @@ adheres to [Semantic Versioning](https://semver.org/).
 - A contract or customer resource the gateway cannot give is asked again a day
   later rather than on every pass, and shown on the usage point page.
 - Shared load-curve arithmetic (`curve.py`) and tariff helpers (`tariffs.py`).
-- Load-curve points dropped from the cache are journaled (schema version 3).
-  Home Assistant rewrites their day, and the InfluxDB exporter deletes them
-  through `/api/v2/delete`. A destination without that endpoint, such as
-  VictoriaMetrics, is reported in the export summary.
 
 ### Changed
 - Consent: an answer without a readable `valid` or `ban` flag is refused; an
   unreadable informational field (call count, quota, dates) is logged and left
   unknown instead of stopping metering.
-- With the Home Assistant exporter enabled, `consumption_detail` needs
-  `consumption`, and `production_detail` needs `production`. A day whose load
-  curve is incomplete is exported from its daily total, and was exported as
-  0 kWh when there was no daily total.
 
 ### Fixed
 - A load-curve day published only partially was never asked for again, so Home
-  Assistant kept that day as a single total at 23:00. Until the day is settled
-  (7 days), it is now asked for again inside the calls made for missing days,
-  which include yesterday every day, so it costs no call of its own. It is asked
-  without the gateway's cache, whose copy may be the same partial day.
-- A day's cached load curve now only gets better. An answer that is not a
-  complete grid never touches a complete day. A complete grid replaces the day,
-  dropping points that are not on it, unless the day already holds a finer
-  grid. Fetching an unchanged day again changes nothing.
+  Assistant kept that day as a single total at 23:00. It is now fetched again
+  until its curve is complete or the day is settled (7 days). After upgrading,
+  recent incomplete days re-enter the backlog and may use a few of the daily
+  gateway calls. A complete-grid answer replaces that day's points so an
+  irregular earlier answer cannot poison the day.
 - Daily Ecowatt signals were dated one day early: the gateway keys each day by
   the day before. Days are now dated by their hourly detail, the range asked is
   shifted accordingly, and upgrading moves every cached Ecowatt day — including

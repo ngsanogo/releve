@@ -5,6 +5,6 @@
 ## Checklist
 
 - [ ] Tests cover the change
-- [ ] `uv run pytest`, `uv run mypy` and `uv run ruff check src tests` pass
+- [ ] The checks in `CONTRIBUTING.md` pass (the Home Assistant ones too if `custom_components` changed)
 - [ ] `CHANGELOG.md` updated under `[Unreleased]` if users will notice
 - [ ] No tokens or real meter ids in the diff

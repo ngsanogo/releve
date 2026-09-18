@@ -9,7 +9,17 @@ uv sync                                    # dependencies, including the dev gro
 uvx pre-commit install                     # ruff and gitleaks before each commit
 uv run pytest --cov                        # tests (CI expects 90% coverage)
 uv run mypy                                # strict, sources and tests
-uv run ruff check src tests && uv run ruff format --check src tests
+uv run ruff check src tests custom_components tests_ha
+uv run ruff format --check src tests custom_components tests_ha
+```
+
+The Home Assistant integration uses its own environment (Home Assistant pins
+its libraries):
+
+```bash
+uv venv --python 3.14 --allow-existing .venv-ha && uv pip install --python .venv-ha -r tests_ha/requirements.txt
+.venv-ha/bin/python -m mypy --config-file tests_ha/mypy.ini custom_components/releve
+(cd tests_ha && ../.venv-ha/bin/python -m pytest)
 ```
 
 The MQTT integration test needs a broker:
@@ -35,8 +45,10 @@ MQTT_TEST_BROKER=127.0.0.1:1883 uv run pytest tests/test_exporter_mqtt.py
 
 ## Releases
 
-1. Set `version` in `pyproject.toml`, run `uv lock`, and turn `[Unreleased]` in
-   `CHANGELOG.md` into `[X.Y.Z] - YYYY-MM-DD`.
+1. Set `version` in `pyproject.toml` and `custom_components/releve/manifest.json`,
+   run `uv lock`, and turn `[Unreleased]` in `CHANGELOG.md` into
+   `[X.Y.Z] - YYYY-MM-DD`. For a final release, also set the tag in the
+   `uv tool install` line of `README.md`.
 2. Tag `vX.Y.Z` (or `vX.Y.Z-rc.N`) on `main` and push the tag.
 3. The release workflow reruns CI, checks the tag against the version, pushes
    the multi-arch image to GHCR and creates the GitHub release with the wheel

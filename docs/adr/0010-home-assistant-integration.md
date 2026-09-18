@@ -2,8 +2,6 @@
 
 Date: 2026-09-18 · Status: accepted
 
-(0009 is reserved by a pending change on load-curve days.)
-
 ## Context
 
 releve reached Home Assistant two ways: long-term statistics (the
