@@ -14,7 +14,7 @@ from websockets.sync.server import ServerConnection, serve
 
 from releve.clock import at_paris_hour, day_start
 from releve.config import HomeAssistantSettings, UsagePointSettings
-from releve.curve import hourly_energy
+from releve.curve import hourly_energy, incomplete_days
 from releve.domain import DailyEnergy, Direction, LoadCurvePoint
 from releve.errors import ExportError
 from releve.exporters.home_assistant import (
@@ -58,6 +58,15 @@ def test_an_incomplete_or_irregular_curve_is_not_guessed() -> None:
     ]
     two = [LoadCurvePoint(PDL, C, day_start(DAY) + timedelta(hours=12 * k), 1) for k in (1, 2)]
     assert hourly_energy(DAY, two) is None  # a 12-hour step does not divide an hour
+
+
+def test_incomplete_days_names_only_the_days_whose_curve_is_not_a_grid() -> None:
+    complete = date(2026, 9, 10)
+    partial = date(2026, 9, 11)
+    points = curve_of(PDL, C, complete) + curve_of(PDL, C, partial)[:24]
+    assert incomplete_days(points) == {partial}
+    assert incomplete_days(curve_of(PDL, C, complete)) == set()
+    assert incomplete_days([]) == set()
 
 
 def test_a_day_without_a_complete_curve_lands_at_23_00() -> None:

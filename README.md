@@ -35,8 +35,9 @@ flowchart LR
   budget — even when a manual `sync` and the daemon run at the same time. An
   upstream throttle becomes a persisted block; nothing retries in a loop.
 - **The history stays complete.** Each pass fetches every missing day of the
-  history window, newest first. A day still empty a week later is recorded as a
-  gap and left alone.
+  history window, newest first. A load-curve day published only partially is
+  asked for again until its curve is complete. A day still empty (or still
+  incomplete) a week later is settled and left alone.
 - **The cache never forgets.** Answers are upserted, never used to delete.
 - **Exports resume where they stopped.** Each exporter keeps a cursor on the
   cache, so a destination that was down catches up on its next run.

@@ -8,7 +8,7 @@ exactly at start + k * step (k = 1..N), N * step equal to the day's length (23,
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 
@@ -40,6 +40,14 @@ def intervals(day: date, points: Sequence[LoadCurvePoint]) -> list[Interval] | N
         return None
     hours = step / ONE_HOUR
     return [Interval(point.end - step, point.end, point.watts * hours) for point in ordered]
+
+
+def incomplete_days(points: Iterable[LoadCurvePoint]) -> set[date]:
+    """Days among `points` whose curve is not a complete grid."""
+    by_day: dict[date, list[LoadCurvePoint]] = defaultdict(list)
+    for point in points:
+        by_day[point.day].append(point)
+    return {day for day, day_points in by_day.items() if intervals(day, day_points) is None}
 
 
 def hour_of(moment: datetime) -> datetime:
