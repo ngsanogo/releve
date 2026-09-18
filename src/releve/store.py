@@ -6,8 +6,9 @@
 * A sync pass is a *run*. Every metering row carries the id of the run that
   last CHANGED it, which is how exporters find what is new since they last
   delivered.
-* Metering data is upserted, never deleted by a sync: an answer that holds
-  less than the cache cannot make the cache forget.
+* Metering data is upserted: an incomplete answer cannot make the cache forget.
+  A load-curve answer that is itself a complete grid replaces that day's points,
+  so an earlier irregular answer cannot keep the day incomplete forever.
 * Each operation opens its own short-lived connection, so web threads, the
   scheduler thread and a concurrent CLI process never share one.
 """
@@ -18,6 +19,7 @@ import fcntl
 import logging
 import re
 import sqlite3
+from collections import defaultdict
 from collections.abc import Iterable, Iterator
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
@@ -28,6 +30,7 @@ from pathlib import Path
 
 from releve import legacy
 from releve.clock import Clock, from_unix, to_unix, utc_now
+from releve.curve import intervals
 from releve.domain import (
     Address,
     Consent,
@@ -368,9 +371,29 @@ class Store:
             return conn.total_changes - before
 
     def upsert_curve(self, run_id: int, points: Iterable[LoadCurvePoint]) -> int:
-        """Insert or update load-curve points; returns how many rows actually changed."""
+        """Insert or update load-curve points; returns how many rows actually changed.
+
+        An incomplete answer is merged in and never erases a fuller day. When the
+        points of a day form a complete grid, that day's prior rows are replaced
+        first: otherwise an irregular earlier answer could keep `intervals` failing
+        forever even after a good answer arrives.
+        """
+        material = list(points)
+        by_day: dict[tuple[str, Direction, date], list[LoadCurvePoint]] = defaultdict(list)
+        for point in material:
+            by_day[(point.usage_point, point.direction, point.day)].append(point)
+        replace = [
+            (usage_point, direction, day)
+            for (usage_point, direction, day), day_points in by_day.items()
+            if intervals(day, day_points) is not None
+        ]
         with self._write() as conn:
             before = conn.total_changes
+            for usage_point, direction, day in replace:
+                conn.execute(
+                    "DELETE FROM load_curve WHERE usage_point = ? AND direction = ? AND day = ?",
+                    (usage_point, direction, day.isoformat()),
+                )
             conn.executemany(
                 "INSERT INTO load_curve (usage_point, direction, end_at, day, watts, run_id) "
                 "VALUES (?, ?, ?, ?, ?, ?) "
@@ -379,7 +402,7 @@ class Store:
                 "WHERE load_curve.watts IS NOT excluded.watts",
                 [
                     (p.usage_point, p.direction, to_unix(p.end), p.day.isoformat(), p.watts, run_id)
-                    for p in points
+                    for p in material
                 ],
             )
             return conn.total_changes - before

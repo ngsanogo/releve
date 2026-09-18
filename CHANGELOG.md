@@ -29,7 +29,10 @@ adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 - A load-curve day published only partially was never asked for again, so Home
   Assistant kept that day as a single total at 23:00. It is now fetched again
-  until its curve is complete or the day is settled (7 days).
+  until its curve is complete or the day is settled (7 days). After upgrading,
+  recent incomplete days re-enter the backlog and may use a few of the daily
+  gateway calls. A complete-grid answer replaces that day's points so an
+  irregular earlier answer cannot poison the day.
 - Daily Ecowatt signals were dated one day early: the gateway keys each day by
   the day before. Days are now dated by their hourly detail, the range asked is
   shifted accordingly, and upgrading moves every cached Ecowatt day — including
