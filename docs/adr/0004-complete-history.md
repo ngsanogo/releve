@@ -20,13 +20,13 @@ less data erase what the cache had.
   older windows still get fetched. If all its days are settled, they become
   confirmed gaps; otherwise the refusal is reported and asked again later.
 - Answers are clamped to their window (the gateway sometimes returns more) and
-  upserted. A sync never deletes metering data.
+  upserted. How a load-curve day may replace or drop points is in
+  [ADR 0009](0009-partial-load-curve-days.md).
 
 ## Consequences
 
 - A fresh install shows recent data first; older history fills in over the
   following passes, within the budget.
 - `releve status`, the dashboard and `/metrics` say how many days are still to
-  fetch.
-- A load-curve day counts as present as soon as it holds one point: a day
-  published only partially is not asked for again.
+  fetch (days with no data). Partially published load-curve days are covered by
+  [ADR 0009](0009-partial-load-curve-days.md).
