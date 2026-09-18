@@ -17,6 +17,8 @@ gateway                        HTTP + parsing, every call reserved first
   │
 planning                       pure: which days, which windows
   │
+state                          the published state of a usage point and of the grid
+  │
 exporters/                     home_assistant, mqtt, influxdb — read the store
   │
 sync                           one pass: rte, usage points, exporters, journal
@@ -41,11 +43,17 @@ cli                            composition root
 | `tariffs.py` | Off-peak hours from the contract; energy split by period |
 | `planning.py` | Missing days, fetch windows, settled gaps — pure functions |
 | `sync.py` | One pass; the pass lock; the journal; exporter cursors |
+| `state.py` | The published state (yesterday, 7 and 30 days, peak power, contract, Tempo, Ecowatt), shared by MQTT and the JSON API |
 | `exporters/` | Home Assistant statistics, MQTT with discovery, Influx line protocol |
 | `scheduler.py` | A thread that runs a pass every interval and reports its health |
 | `metrics.py` | Prometheus text exposition |
 | `web/` | Starlette app: dashboard, JSON API, `/metrics`, `/healthz`, token auth |
 | `cli.py` | argparse commands; wires everything together |
+
+Outside the package, `custom_components/releve/` is the Home Assistant
+integration HACS installs. It is a client of the JSON API only — it never
+imports `releve` — and is tested in its own environment against a pinned Home
+Assistant (`tests_ha/`).
 
 ## The rules that keep it simple
 
@@ -78,3 +86,4 @@ The ADRs record why things are the way they are:
 - [0006 — Home Assistant series: pinned boundary, hourly rows](adr/0006-home-assistant-series.md)
 - [0007 — A small, synchronous runtime](adr/0007-small-synchronous-runtime.md)
 - [0008 — Hand-rolled Prometheus exposition](adr/0008-hand-rolled-prometheus.md)
+- [0010 — A Home Assistant integration over the JSON API](adr/0010-home-assistant-integration.md)

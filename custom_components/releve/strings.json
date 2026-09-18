@@ -1,0 +1,119 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to releve",
+        "description": "releve keeps your electricity meter's history ({docs_url}). Enter the address of its web interface.",
+        "data": {
+          "url": "URL",
+          "token": "Token"
+        },
+        "data_description": {
+          "url": "releve's web address, e.g. {example} when both run on the same host.",
+          "token": "Only if releve sets web.auth_token."
+        }
+      },
+      "reauth_confirm": {
+        "title": "releve needs its token",
+        "description": "releve at {url} refused the token. Enter its web.auth_token.",
+        "data": {
+          "token": "Token"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "releve did not answer at this address.",
+      "invalid_auth": "releve refused the token.",
+      "no_usage_points": "releve answers but has no usage point configured."
+    },
+    "abort": {
+      "already_configured": "This releve server is already set up.",
+      "reauth_successful": "The token is updated."
+    }
+  },
+  "device": {
+    "grid": {
+      "name": "Grid signals"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "energy_yesterday": {
+        "name": "Energy yesterday"
+      },
+      "energy_last_7_days": {
+        "name": "Energy last 7 days"
+      },
+      "energy_last_30_days": {
+        "name": "Energy last 30 days"
+      },
+      "energy_yesterday_peak": {
+        "name": "Peak-hours energy yesterday"
+      },
+      "energy_yesterday_offpeak": {
+        "name": "Off-peak energy yesterday"
+      },
+      "production_yesterday": {
+        "name": "Production yesterday"
+      },
+      "production_last_7_days": {
+        "name": "Production last 7 days"
+      },
+      "production_last_30_days": {
+        "name": "Production last 30 days"
+      },
+      "max_power_yesterday": {
+        "name": "Max power yesterday"
+      },
+      "latest_day": {
+        "name": "Latest day"
+      },
+      "latest_production_day": {
+        "name": "Latest production day"
+      },
+      "last_success": {
+        "name": "Last successful sync"
+      },
+      "consent_expires_at": {
+        "name": "Consent expiry"
+      },
+      "call_number": {
+        "name": "Gateway calls today"
+      },
+      "subscribed_power": {
+        "name": "Subscribed power"
+      },
+      "distribution_tariff": {
+        "name": "Distribution tariff"
+      },
+      "offpeak_hours": {
+        "name": "Off-peak hours"
+      },
+      "tempo_today": {
+        "name": "Tempo today",
+        "state": {
+          "blue": "Blue",
+          "white": "White",
+          "red": "Red"
+        }
+      },
+      "ecowatt_today": {
+        "name": "Ecowatt today",
+        "state": {
+          "green": "Normal",
+          "orange": "Tense",
+          "red": "Very tense"
+        }
+      },
+      "tempo_days_left_blue": {
+        "name": "Tempo blue days left"
+      },
+      "tempo_days_left_white": {
+        "name": "Tempo white days left"
+      },
+      "tempo_days_left_red": {
+        "name": "Tempo red days left"
+      }
+    }
+  }
+}

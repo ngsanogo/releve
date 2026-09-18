@@ -25,8 +25,8 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --frozen
-      - run: uv run ruff check src tests
-      - run: uv run ruff format --check src tests
+      - run: uv run ruff check src tests custom_components tests_ha
+      - run: uv run ruff format --check src tests custom_components tests_ha
       - run: uv run mypy
 
   test:
@@ -50,6 +50,36 @@ jobs:
           enable-cache: true
       - run: uv sync --frozen
       - run: uv run pytest --cov --cov-report=term-missing --cov-fail-under=90
+
+  home-assistant:
+    name: Home Assistant integration · hassfest · HACS · tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: hassfest
+        uses: home-assistant/actions/hassfest@58bff37c8947f690ace498be413a9b78d6f30f93 # master, 2026-09
+      - name: HACS validation
+        uses: hacs/action@d556e736723344f83838d08488c983a15381059a # 22.5.0
+        with:
+          category: integration
+          # The domain is not in home-assistant/brands; everything else is checked.
+          ignore: brands
+          comment: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          python-version: "3.14"
+          enable-cache: true
+      # Its own environment: Home Assistant pins libraries releve also locks.
+      - run: |
+          uv venv "$RUNNER_TEMP/ha"
+          uv pip install --python "$RUNNER_TEMP/ha" -r tests_ha/requirements.txt
+      - name: Types (mypy strict, against homeassistant)
+        run: '"$RUNNER_TEMP/ha/bin/python" -m mypy --config-file tests_ha/mypy.ini custom_components/releve'
+      - name: Tests against the pinned Home Assistant
+        working-directory: tests_ha
+        run: '"$RUNNER_TEMP/ha/bin/python" -m pytest'
 
   audit:
     name: dependency audit

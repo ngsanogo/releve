@@ -1,0 +1,119 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connexion à releve",
+        "description": "releve conserve l'historique de votre compteur électrique ({docs_url}). Indiquez l'adresse de son interface web.",
+        "data": {
+          "url": "URL",
+          "token": "Jeton"
+        },
+        "data_description": {
+          "url": "Adresse web de releve, par exemple {example} s'il tourne sur la même machine.",
+          "token": "Seulement si releve définit web.auth_token."
+        }
+      },
+      "reauth_confirm": {
+        "title": "releve demande son jeton",
+        "description": "releve ({url}) a refusé le jeton. Saisissez son web.auth_token.",
+        "data": {
+          "token": "Jeton"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "releve ne répond pas à cette adresse.",
+      "invalid_auth": "releve a refusé le jeton.",
+      "no_usage_points": "releve répond mais aucun point de livraison n'y est configuré."
+    },
+    "abort": {
+      "already_configured": "Ce serveur releve est déjà configuré.",
+      "reauth_successful": "Le jeton est mis à jour."
+    }
+  },
+  "device": {
+    "grid": {
+      "name": "Signaux du réseau"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "energy_yesterday": {
+        "name": "Énergie d'hier"
+      },
+      "energy_last_7_days": {
+        "name": "Énergie des 7 derniers jours"
+      },
+      "energy_last_30_days": {
+        "name": "Énergie des 30 derniers jours"
+      },
+      "energy_yesterday_peak": {
+        "name": "Énergie d'hier en heures pleines"
+      },
+      "energy_yesterday_offpeak": {
+        "name": "Énergie d'hier en heures creuses"
+      },
+      "production_yesterday": {
+        "name": "Production d'hier"
+      },
+      "production_last_7_days": {
+        "name": "Production des 7 derniers jours"
+      },
+      "production_last_30_days": {
+        "name": "Production des 30 derniers jours"
+      },
+      "max_power_yesterday": {
+        "name": "Puissance max d'hier"
+      },
+      "latest_day": {
+        "name": "Dernier jour publié"
+      },
+      "latest_production_day": {
+        "name": "Dernier jour de production publié"
+      },
+      "last_success": {
+        "name": "Dernière synchronisation réussie"
+      },
+      "consent_expires_at": {
+        "name": "Fin du consentement"
+      },
+      "call_number": {
+        "name": "Appels à la passerelle aujourd'hui"
+      },
+      "subscribed_power": {
+        "name": "Puissance souscrite"
+      },
+      "distribution_tariff": {
+        "name": "Tarif d'acheminement"
+      },
+      "offpeak_hours": {
+        "name": "Heures creuses"
+      },
+      "tempo_today": {
+        "name": "Tempo du jour",
+        "state": {
+          "blue": "Bleu",
+          "white": "Blanc",
+          "red": "Rouge"
+        }
+      },
+      "ecowatt_today": {
+        "name": "Ecowatt du jour",
+        "state": {
+          "green": "Normal",
+          "orange": "Tendu",
+          "red": "Très tendu"
+        }
+      },
+      "tempo_days_left_blue": {
+        "name": "Jours Tempo bleus restants"
+      },
+      "tempo_days_left_white": {
+        "name": "Jours Tempo blancs restants"
+      },
+      "tempo_days_left_red": {
+        "name": "Jours Tempo rouges restants"
+      }
+    }
+  }
+}

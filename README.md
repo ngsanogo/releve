@@ -122,11 +122,44 @@ pinned boundaries and can set one explicitly, for instance after restoring a
 database — the next export then rewrites everything after it. As with any tool
 writing to your statistics, a Home Assistant backup beforehand is a good habit.
 
+## Home Assistant integration (HACS)
+
+The repository is also a [HACS](https://hacs.xyz) integration. It reads
+releve's JSON API and shows what the cache knows as native sensors — no MQTT
+broker needed:
+
+- per usage point: energy of yesterday and of the last 7 and 30 days, peak and
+  off-peak energy of yesterday, production, yesterday's max power; as
+  diagnostics, the latest published day, the last successful sync, consent
+  expiry, gateway calls, and the contract's subscribed power, tariff and
+  off-peak hours;
+- a *Grid signals* device: today's Tempo color and Ecowatt level, and the
+  Tempo days left in the season.
+
+A sensor exists when releve publishes its value — a dataset turned off in
+releve has no sensor — and a value releve cannot state truthfully (yesterday
+not published yet, a week with a missing day) is *unknown*, never zero.
+
+Install: HACS → ⋮ → *Custom repositories* → `https://github.com/ngsanogo/releve`,
+category *Integration*; download *releve*, restart Home Assistant, then
+*Settings → Devices & services → Add integration → releve*, with releve's
+address (for instance `http://127.0.0.1:8080` on the same host) and its
+`web.auth_token` if it has one. A refused token opens a re-authentication
+prompt.
+
+The integration and the releve server share their version: install the release
+matching the server. Long-term statistics for the Energy dashboard stay with
+the [`home_assistant` exporter](#home-assistant) — the integration's rolling
+totals are deliberately not statistics.
+
 ## Web interface and API
 
 `releve serve` runs the sync passes and a small read-only web page: freshness,
 days still to fetch, quota, exports and the journal. It also serves:
 
+- `GET /api/v1/usage-points` — the configured usage points, their datasets and last successful sync
+- `GET /api/v1/usage-points/{pdl}/state`, `GET /api/v1/rte/state` — the state MQTT publishes
+  (the latter 404 when `sync.rte_signals` is off)
 - `GET /api/v1/usage-points/{pdl}/daily?start=YYYY-MM-DD&end=YYYY-MM-DD[&direction=production]`
 - `GET /api/v1/usage-points/{pdl}/curve?start=…&end=…[&direction=]`
 - `GET /api/v1/usage-points/{pdl}/max-power?start=…&end=…`
@@ -165,8 +198,14 @@ configuration or database, 3 another pass is already running.
 ```bash
 uv sync                          # dependencies, including the dev group
 uv run pytest                    # tests
-uv run ruff check src tests && uv run ruff format --check src tests
+uv run ruff check src tests custom_components tests_ha
+uv run ruff format --check src tests custom_components tests_ha
 uv run mypy                      # strict
+
+# The Home Assistant integration, in its own environment (Home Assistant pins its libraries):
+uv venv --python 3.14 .venv-ha && uv pip install --python .venv-ha -r tests_ha/requirements.txt
+.venv-ha/bin/python -m mypy --config-file tests_ha/mypy.ini custom_components/releve
+(cd tests_ha && ../.venv-ha/bin/python -m pytest)
 uvx pre-commit install           # optional: ruff and gitleaks before each commit
 ```
 
