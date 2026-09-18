@@ -70,6 +70,8 @@ class FakeGateway:
     published_until: date
     holes: set[date] = field(default_factory=set)
     partial_curves: set[date] = field(default_factory=set)  # served with half their points
+    # The gateway's cache endpoints serve a curve day as they first served it.
+    stale_curve_cache: bool = False
     throttled_curves: bool = False
     refused_usage_points: set[str] = field(default_factory=set)
     unreachable: bool = False
@@ -77,6 +79,10 @@ class FakeGateway:
     consent_valid: bool = True
     consent_banned: bool = False
     calls: list[Call] = field(default_factory=list)
+    uncached_calls: list[Call] = field(default_factory=list)
+    _curve_cache: dict[tuple[str, Direction, date], list[LoadCurvePoint]] = field(
+        default_factory=dict
+    )
     deleted: list[tuple[str, CacheResource, date | None, date | None]] = field(default_factory=list)
 
     def _charge(
@@ -154,9 +160,17 @@ class FakeGateway:
         ]
 
     def load_curve(
-        self, usage_point: str, direction: Direction, start: date, end: date
+        self,
+        usage_point: str,
+        direction: Direction,
+        start: date,
+        end: date,
+        *,
+        use_cache: bool = True,
     ) -> list[LoadCurvePoint]:
         self._charge(usage_point, f"{direction}_load_curve", start, end)
+        if not use_cache:
+            self.uncached_calls.append((usage_point, f"{direction}_load_curve", start, end))
         if self.throttled_curves:
             retry_at = self.clock() + timedelta(hours=2)
             self.governor.block(usage_point, retry_at, "throttled upstream")
@@ -165,9 +179,14 @@ class FakeGateway:
         served = self._available(start, end + timedelta(days=1))
         points = []
         for day in served:
+            key = (usage_point, direction, day)
+            if self.stale_curve_cache and use_cache and key in self._curve_cache:
+                points += self._curve_cache[key]
+                continue
             day_points = curve_of(usage_point, direction, day)
             if day in self.partial_curves:
                 day_points = day_points[: len(day_points) // 2]
+            self._curve_cache[key] = day_points
             points += day_points
         return points
 

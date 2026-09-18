@@ -49,6 +49,46 @@ def test_windows_are_newest_first_and_as_few_as_possible(offsets: set[int], wind
 
 
 @given(
+    offsets=day_offsets,
+    refresh_offsets=st.sets(st.integers(min_value=1, max_value=800), max_size=12),
+    window=st.integers(min_value=1, max_value=365),
+)
+def test_refresh_days_never_add_a_window_nor_move_a_missing_day(
+    offsets: set[int], refresh_offsets: set[int], window: int
+) -> None:
+    missing = _newest_first(offsets)
+    refresh = {TODAY - timedelta(days=n) for n in refresh_offsets}
+
+    plain = plan_windows(missing, window)
+    stretched = plan_windows(missing, window, refresh=refresh)
+
+    assert len(stretched) == len(plain)
+    for (start, end), (plain_start, plain_end) in zip(stretched, plain, strict=True):
+        assert start <= plain_start < plain_end <= end
+        assert (end - start).days <= window
+        assert [d for d in missing if start <= d < end] == [
+            d for d in missing if plain_start <= d < plain_end
+        ]
+    for (newer_start, _), (_, older_end) in pairwise(stretched):
+        assert older_end <= newer_start
+    for day in refresh:
+        if not any(start <= day < end for start, end in stretched):
+            # left out only when no window could take it in
+            assert all(
+                (max(end, day + timedelta(days=1)) - min(start, day)).days > window
+                for start, end in stretched
+            )
+
+
+def test_refresh_days_ride_along_with_yesterday_and_never_alone() -> None:
+    yesterday = TODAY - timedelta(days=1)
+    partial = {TODAY - timedelta(days=3), TODAY - timedelta(days=6)}
+    assert plan_windows([yesterday], 7, refresh=partial) == [(TODAY - timedelta(days=6), TODAY)]
+    assert plan_windows([yesterday], 5, refresh=partial) == [(TODAY - timedelta(days=3), TODAY)]
+    assert plan_windows([], 7, refresh=partial) == []
+
+
+@given(
     span=st.integers(min_value=0, max_value=400),
     known=st.sets(st.integers(min_value=0, max_value=400), max_size=50),
 )

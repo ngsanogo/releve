@@ -35,12 +35,14 @@ flowchart LR
   budget — even when a manual `sync` and the daemon run at the same time. An
   upstream throttle becomes a persisted block; nothing retries in a loop.
 - **The history stays complete.** Each pass fetches every missing day of the
-  history window, newest first. A load-curve day published only partially is
-  asked for again until its curve is complete. A day still empty a week later
-  becomes a confirmed gap; a curve day still incomplete after a week is kept
-  as it is (exporters fall back to the daily total).
-- **The cache never forgets.** Incomplete answers are upserted, never used to
-  erase a fuller day. A complete load-curve answer replaces that day's points.
+  history window, newest first. A day still empty a week later is recorded as a
+  gap and left alone. A load-curve day published only partially is asked for
+  again, without the gateway's cache, inside the calls made for missing days,
+  so it never costs a call of its own. This lasts until the day is complete or
+  a week old ([details](docs/adr/0009-partial-load-curve-days.md)).
+- **The cache never forgets.** Answers are upserted: one holding less never
+  erases what the cache has. A load-curve day only ever gets better, and a
+  point it drops is dropped by the exporters too.
 - **Exports resume where they stopped.** Each exporter keeps a cursor on the
   cache, so a destination that was down catches up on its next run.
 - **Home Assistant series can be continued.** An existing statistic series is
@@ -106,13 +108,15 @@ exporters:
 |---|---|
 | `home_assistant` | Long-term statistics `releve:<pdl>_consumption` / `_production` (kWh), for the Energy dashboard |
 | `mqtt` | Retained JSON state (yesterday, last 7 and 30 days, peak power, Tempo, Ecowatt) with Home Assistant discovery |
-| `influxdb` | Influx line protocol on `/api/v2/write`, for InfluxDB v2 and VictoriaMetrics |
+| `influxdb` | Influx line protocol on `/api/v2/write`, for InfluxDB v2 and VictoriaMetrics; points the cache drops are deleted through `/api/v2/delete`, which VictoriaMetrics lacks (the export summary says so) |
 
 ### Home Assistant
 
-Statistics are written hour by hour. A day whose load curve is complete gets its
-measured hourly energy; any other day stays flat until 23:00, where the day's
-total lands — a daily total is only known once the day is over.
+Statistics are written hour by hour, from the daily totals. A day whose load
+curve is complete gets its measured hourly energy. Any other day stays flat
+until 23:00, where the day's total lands, because a daily total is only known
+once the day is over. So with this exporter, `consumption_detail` needs
+`consumption`, and `production_detail` needs `production`.
 
 To **continue a series** another integration started, set `statistic_id` to its
 id. On the first export releve reads the last point Home Assistant holds for it
