@@ -6,6 +6,7 @@ import fcntl
 import sqlite3
 import threading
 from contextlib import closing
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
@@ -165,22 +166,108 @@ def test_an_answer_with_less_data_never_deletes_the_cache(store: Store) -> None:
     assert store.daily(PDL, C, date.min, date.max) == [DailyEnergy(PDL, C, DAY, 5000)]
 
 
-def test_a_complete_curve_answer_replaces_orphan_points_but_a_partial_one_does_not(
-    store: Store,
-) -> None:
-    run = store.start_run(NOW)
+def test_a_partial_curve_answer_is_merged_into_a_partial_day(store: Store) -> None:
+    run_1, run_2 = store.start_run(NOW), store.start_run(NOW)
+    complete = curve_of(PDL, C, DAY)
+    assert store.upsert_curve(run_1, complete[:24]) == 24
+    assert store.upsert_curve(run_2, complete[12:36]) == 12  # the overlap is unchanged
+
+    assert store.curve(PDL, C, DAY, DAY + timedelta(days=1)) == complete[:36]
+    assert store.upsert_curve(run_2, complete[36:]) == 12  # together, a complete grid
+    assert store.curve(PDL, C, DAY, DAY + timedelta(days=1)) == complete
+
+
+def test_a_complete_curve_answer_drops_the_points_off_its_grid(store: Store) -> None:
+    run_1, run_2 = store.start_run(NOW), store.start_run(NOW)
     orphan = LoadCurvePoint(PDL, C, day_start(DAY) + timedelta(minutes=10), 999)
     complete = curve_of(PDL, C, DAY)
-    store.upsert_curve(run, [orphan, *complete[:24]])
+    store.upsert_curve(run_1, [orphan, *complete[:24]])
+    assert store.upsert_curve(run_1, complete[:24]) == 0  # still not a grid: keep everything
     assert len(store.curve(PDL, C, DAY, DAY + timedelta(days=1))) == 25
 
-    store.upsert_curve(run, complete[:24])  # still incomplete: keep what we had
-    assert len(store.curve(PDL, C, DAY, DAY + timedelta(days=1))) == 25
+    assert store.upsert_curve(run_2, complete) == 24 + 1  # 24 points added, the orphan dropped
 
-    store.upsert_curve(run, complete)  # complete grid: orphans go away
-    cached = store.curve(PDL, C, DAY, DAY + timedelta(days=1))
-    assert cached == complete
-    assert orphan.end not in {point.end for point in cached}
+    assert store.curve(PDL, C, DAY, DAY + timedelta(days=1)) == complete
+    assert store.removed_curve(after_run=run_1, up_to_run=run_2) == [orphan]
+    assert store.removed_curve(after_run=run_2, up_to_run=run_2) == []
+
+
+def test_a_dropped_point_alone_marks_its_day_changed(store: Store) -> None:
+    run_1, run_2 = store.start_run(NOW), store.start_run(NOW)
+    orphan = LoadCurvePoint(PDL, C, day_start(DAY) + timedelta(minutes=10), 999)
+    complete = curve_of(PDL, C, DAY)
+    store.upsert_curve(run_1, [orphan, *complete])  # not a grid: merged as it is
+
+    assert store.upsert_curve(run_2, complete) == 1
+    assert store.changed_curve(after_run=run_1, up_to_run=run_2) == []
+    assert store.removed_curve(after_run=run_1, up_to_run=run_2) == [orphan]
+    assert store.earliest_changed_day(PDL, C, after_run=run_1, up_to_run=run_2) == DAY
+
+
+def test_a_complete_curve_answer_already_cached_changes_nothing(store: Store) -> None:
+    run_1, run_2 = store.start_run(NOW), store.start_run(NOW)
+    complete = curve_of(PDL, C, DAY)
+    assert store.upsert_curve(run_1, complete) == len(complete)
+    assert store.upsert_curve(run_2, complete) == 0
+    assert store.changed_curve(after_run=run_1, up_to_run=run_2) == []
+    assert store.earliest_changed_day(PDL, C, after_run=run_1, up_to_run=run_2) is None
+
+
+def test_a_complete_curve_answer_corrects_a_complete_day(store: Store) -> None:
+    run_1, run_2 = store.start_run(NOW), store.start_run(NOW)
+    complete = curve_of(PDL, C, DAY)
+    store.upsert_curve(run_1, complete)
+    corrected = replace(complete[5], watts=complete[5].watts + 1)
+
+    assert store.upsert_curve(run_2, [*complete[:5], corrected, *complete[6:]]) == 1
+    assert store.changed_curve(after_run=run_1, up_to_run=run_2) == [corrected]
+
+
+def test_a_complete_day_ignores_a_partial_answer(store: Store) -> None:
+    run = store.start_run(NOW)
+    complete = curve_of(PDL, C, DAY)
+    store.upsert_curve(run, complete)
+    stray = LoadCurvePoint(PDL, C, day_start(DAY) + timedelta(minutes=10), 999)
+    different = replace(complete[0], watts=complete[0].watts + 1)
+
+    assert store.upsert_curve(run, [stray, different]) == 0
+    assert store.curve(PDL, C, DAY, DAY + timedelta(days=1)) == complete
+
+
+def test_a_coarser_grid_never_replaces_a_finer_one(store: Store) -> None:
+    run = store.start_run(NOW)
+    half_hours = curve_of(PDL, C, DAY)
+    # Every other half-hour point: a complete hourly grid, with half-hour values.
+    hour_ends = half_hours[1::2]
+    store.upsert_curve(run, half_hours)
+
+    assert store.upsert_curve(run, [replace(p, watts=p.watts + 1) for p in hour_ends]) == 0
+    assert store.curve(PDL, C, DAY, DAY + timedelta(days=1)) == half_hours
+
+
+def test_a_finer_grid_replaces_a_coarser_one(store: Store) -> None:
+    run = store.start_run(NOW)
+    half_hours = curve_of(PDL, C, DAY)
+    hour_ends = [replace(p, watts=p.watts + 1) for p in half_hours[1::2]]
+    store.upsert_curve(run, hour_ends)
+
+    assert store.upsert_curve(run, half_hours) == len(half_hours)  # 24 added, 24 corrected
+    assert store.curve(PDL, C, DAY, DAY + timedelta(days=1)) == half_hours
+    assert store.removed_curve(after_run=0, up_to_run=run) == []
+
+
+def test_each_series_day_of_an_answer_is_judged_on_its_own(store: Store) -> None:
+    run = store.start_run(NOW)
+    consumption, production = curve_of(PDL, C, DAY), curve_of(PDL, Direction.PRODUCTION, DAY)
+    orphan = LoadCurvePoint(PDL, C, day_start(DAY) + timedelta(minutes=10), 999)
+    store.upsert_curve(run, [orphan, *consumption[:24]])
+
+    # Two halves of different series are no complete grid: the orphan stays.
+    assert store.upsert_curve(run, [*consumption[24:], *production[:24]]) == 48
+    assert len(store.curve(PDL, C, DAY, DAY + timedelta(days=1))) == 49
+    store.upsert_curve(run, [*consumption, *production])
+    assert store.curve(PDL, C, DAY, DAY + timedelta(days=1)) == consumption
+    assert store.curve(PDL, Direction.PRODUCTION, DAY, DAY + timedelta(days=1)) == production
 
 
 def test_a_midnight_curve_point_closes_the_previous_day(store: Store) -> None:

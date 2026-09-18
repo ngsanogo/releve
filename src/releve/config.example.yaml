@@ -6,7 +6,8 @@
 
 gateway:
   token: ""                 # REQUIRED — generate it on https://www.myelectricaldata.fr
-  prefer_cache: true        # ask the gateway's cache endpoints first (lighter on Enedis)
+  prefer_cache: true        # ask the gateway's cache endpoints first (lighter on Enedis);
+                            # a partially published load-curve day is asked without it
   daily_call_budget: 45     # local ceiling per usage point; the gateway allows 50 a day
   timeout_seconds: 30
 
@@ -16,7 +17,7 @@ usage_points:
     consumption: true       # daily consumption
     consumption_detail: false  # 30-minute load curve: hourly Home Assistant statistics
     production: false       # daily production
-    production_detail: false
+    production_detail: false   # Home Assistant needs the daily data with the load curve
     max_power: false        # daily maximum apparent power
     contract: true          # distribution contract (off-peak hours, subscribed power)
     identity: false         # account holder name (PII)
