@@ -8,6 +8,13 @@ updates:
       minor-and-patch:
         update-types: ["minor", "patch"]
 
+  # The Home Assistant the integration is tested against (tests_ha/requirements.txt):
+  # pytest-homeassistant-custom-component pins homeassistant, one release each.
+  - package-ecosystem: "pip"
+    directory: "/tests_ha"
+    schedule:
+      interval: "weekly"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

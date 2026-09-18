@@ -6,7 +6,18 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-18
+
 ### Added
+- A Home Assistant integration, installable with HACS (`custom_components/releve`,
+  `hacs.json`): set up from the UI with releve's URL (and `web.auth_token` if
+  set), it shows each usage point's state and the grid signals as native
+  sensors — no MQTT broker needed. Tested against Home Assistant 2026.9 with
+  `hassfest`, the HACS validation and `pytest-homeassistant-custom-component`.
+- `GET /api/v1/usage-points`, `GET /api/v1/usage-points/{pdl}/state` and
+  `GET /api/v1/rte/state`: the configured usage points and the state MQTT
+  publishes, as JSON. The state is computed in one place (`releve.state`) for
+  both.
 - Full MyElectricalData coverage beyond metering: `valid_access` (consent),
   contracts, identity, contact, addresses, Tempo season and prices, hourly
   Ecowatt detail, and `DELETE` remote-cache endpoints (`releve purge-cache`).
@@ -55,5 +66,6 @@ First release.
 - One-way import of databases in the earlier SQLAlchemy layout, with a backup.
 - Container image for amd64 and arm64.
 
-[Unreleased]: https://github.com/ngsanogo/releve/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/ngsanogo/releve/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/ngsanogo/releve/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/ngsanogo/releve/releases/tag/v0.1.0
