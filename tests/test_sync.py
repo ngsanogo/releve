@@ -14,7 +14,7 @@ from releve.quota import QuotaGovernor
 from releve.store import Store
 from releve.sync import backlog, exclusive_pass, export, run_pass
 from tests.conftest import OTHER_PDL, PDL, FrozenClock, make_settings
-from tests.fakes import FakeGateway
+from tests.fakes import FakeGateway, curve_of
 
 TODAY = date(2026, 9, 12)
 
@@ -119,6 +119,52 @@ def test_a_recent_partial_curve_is_asked_again_until_complete_but_an_old_one_is_
         )
         == recent
     )
+
+
+def test_incomplete_curve_settle_boundary_is_age_settle_days(
+    store: Store,
+) -> None:
+    """Age SETTLE_DAYS-1 is still asked; age SETTLE_DAYS is kept as-is."""
+    from tests.conftest import NOW
+
+    unsettled = TODAY - timedelta(days=SETTLE_DAYS - 1)
+    settled = TODAY - timedelta(days=SETTLE_DAYS)
+    run = store.start_run(NOW)
+    store.upsert_curve(run, curve_of(PDL, Direction.CONSUMPTION, unsettled)[:24])
+    store.upsert_curve(run, curve_of(PDL, Direction.CONSUMPTION, settled)[:24])
+
+    missing = backlog(store, PDL, Dataset.CURVE_CONSUMPTION, 30, TODAY)
+    assert unsettled in missing
+    assert settled not in missing
+
+
+def test_a_recent_partial_production_curve_is_asked_again(
+    database: Path, store: Store, governor: QuotaGovernor, clock: FrozenClock
+) -> None:
+    recent = TODAY - timedelta(days=1)
+    settings = make_settings(
+        database,
+        usage_points=[
+            {
+                "id": PDL,
+                "consumption": False,
+                "production": False,
+                "production_detail": True,
+                "contract": False,
+            }
+        ],
+        sync={"history_days": 5},
+    )
+    gateway = gateway_for(governor, clock, partial_curves={recent})
+    run_pass(settings, gateway, store, [], clock)
+    assert backlog(store, PDL, Dataset.CURVE_PRODUCTION, 5, TODAY) == [recent]
+
+    gateway.partial_curves.clear()
+    gateway.calls.clear()
+    run_pass(settings, gateway, store, [], clock)
+    assert (PDL, "production_load_curve", recent, recent + timedelta(days=1)) in gateway.calls
+    assert backlog(store, PDL, Dataset.CURVE_PRODUCTION, 5, TODAY) == []
+    assert len(store.curve(PDL, Direction.PRODUCTION, recent, recent + timedelta(days=1))) == 48
 
 
 def test_an_unpublished_yesterday_is_asked_again_until_it_arrives(

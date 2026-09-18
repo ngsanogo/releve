@@ -36,9 +36,11 @@ flowchart LR
   upstream throttle becomes a persisted block; nothing retries in a loop.
 - **The history stays complete.** Each pass fetches every missing day of the
   history window, newest first. A load-curve day published only partially is
-  asked for again until its curve is complete. A day still empty (or still
-  incomplete) a week later is settled and left alone.
-- **The cache never forgets.** Answers are upserted, never used to delete.
+  asked for again until its curve is complete. A day still empty a week later
+  becomes a confirmed gap; a curve day still incomplete after a week is kept
+  as it is (exporters fall back to the daily total).
+- **The cache never forgets.** Incomplete answers are upserted, never used to
+  erase a fuller day. A complete load-curve answer replaces that day's points.
 - **Exports resume where they stopped.** Each exporter keeps a cursor on the
   cache, so a destination that was down catches up on its next run.
 - **Home Assistant series can be continued.** An existing statistic series is

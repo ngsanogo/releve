@@ -25,6 +25,7 @@ from releve.domain import (
 from releve.errors import StoreError
 from releve.store import CustomerFailure, HaBoundary, Refusal, Store, migrations
 from tests.conftest import NOW, PDL, FrozenClock
+from tests.fakes import curve_of
 
 DAY = date(2026, 9, 10)
 C = Direction.CONSUMPTION
@@ -162,6 +163,24 @@ def test_an_answer_with_less_data_never_deletes_the_cache(store: Store) -> None:
     store.upsert_daily(run, [DailyEnergy(PDL, C, DAY, 5000)])
     store.upsert_daily(run, [])
     assert store.daily(PDL, C, date.min, date.max) == [DailyEnergy(PDL, C, DAY, 5000)]
+
+
+def test_a_complete_curve_answer_replaces_orphan_points_but_a_partial_one_does_not(
+    store: Store,
+) -> None:
+    run = store.start_run(NOW)
+    orphan = LoadCurvePoint(PDL, C, day_start(DAY) + timedelta(minutes=10), 999)
+    complete = curve_of(PDL, C, DAY)
+    store.upsert_curve(run, [orphan, *complete[:24]])
+    assert len(store.curve(PDL, C, DAY, DAY + timedelta(days=1))) == 25
+
+    store.upsert_curve(run, complete[:24])  # still incomplete: keep what we had
+    assert len(store.curve(PDL, C, DAY, DAY + timedelta(days=1))) == 25
+
+    store.upsert_curve(run, complete)  # complete grid: orphans go away
+    cached = store.curve(PDL, C, DAY, DAY + timedelta(days=1))
+    assert cached == complete
+    assert orphan.end not in {point.end for point in cached}
 
 
 def test_a_midnight_curve_point_closes_the_previous_day(store: Store) -> None:

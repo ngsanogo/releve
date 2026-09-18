@@ -27,7 +27,9 @@ less data erase what the cache had.
   older windows still get fetched. If all its days are settled, they become
   confirmed gaps; otherwise the refusal is reported and asked again later.
 - Answers are clamped to their window (the gateway sometimes returns more) and
-  upserted. A sync never deletes metering data.
+  upserted. An incomplete answer never erases a fuller cache. A load-curve
+  answer whose points form a complete grid **replaces** that day's rows, so an
+  earlier irregular answer cannot keep the day incomplete forever.
 
 ## Consequences
 
