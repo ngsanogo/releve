@@ -12,8 +12,10 @@ Ownership
     series pinned for another usage point is refused.
 
 Granularity
-    Every owned day, from the first to the last day with data, is written hour
-    by hour, so a day can change granularity without leaving stale rows behind:
+    A series is built from the daily totals (the configuration requires them),
+    refined by the load curve when it is enabled. Every owned day, from the
+    first to the last day with data, is written hour by hour, so a day can
+    change granularity without leaving stale rows behind:
     * a day whose load curve is a complete, regular grid from midnight to
       midnight gets its measured hourly energy, from the curve;
     * any other day with a daily total stays flat until 23:00, where the whole
@@ -32,7 +34,6 @@ from __future__ import annotations
 import json
 import logging
 import re
-from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
@@ -44,7 +45,7 @@ from websockets.sync.client import ClientConnection, connect
 
 from releve.clock import PARIS, at_paris_hour, day_start
 from releve.config import HomeAssistantSettings, UsagePointSettings
-from releve.curve import day_hours, hourly_energy
+from releve.curve import day_hours, hourly_energy, split_days
 from releve.domain import DailyEnergy, Direction, LoadCurvePoint
 from releve.errors import ExportError
 from releve.store import HaBoundary, Store
@@ -117,13 +118,13 @@ class HomeAssistantExporter:
             candidates = (
                 (
                     Direction.CONSUMPTION,
-                    up.consumption or up.consumption_detail,
+                    up.consumption,
                     settings.statistic_id,
                     settings.statistic_name,
                 ),
                 (
                     Direction.PRODUCTION,
-                    up.production or up.production_detail,
+                    up.production,
                     settings.production_statistic_id,
                     settings.production_statistic_name,
                 ),
@@ -265,11 +266,9 @@ def _instant(row: dict[str, Any], statistic_id: str) -> datetime:
 def series_rows(
     daily: Sequence[DailyEnergy], curve: Sequence[LoadCurvePoint], boundary: HaBoundary
 ) -> list[StatisticRow]:
-    """Hourly cumulative rows for every owned day, continuing the boundary's sum."""
+    """Hourly cumulative rows for every owned day of one series, continuing the boundary's sum."""
     totals = {reading.day: reading.wh for reading in daily}
-    curve_by_day: dict[date, list[LoadCurvePoint]] = defaultdict(list)
-    for point in curve:
-        curve_by_day[point.day].append(point)
+    curve_by_day = {key.day: points for key, points in split_days(curve).items()}
     owned = sorted(
         day
         for day in totals.keys() | curve_by_day.keys()

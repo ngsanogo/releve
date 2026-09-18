@@ -100,6 +100,18 @@ def test_cache_endpoints_are_used_when_preferred(
     assert mock.calls(f"{DAILY_PATH}/cache") == 1
 
 
+def test_a_load_curve_can_be_asked_past_the_cache(
+    mock: HttpDouble, governor: QuotaGovernor, clock: FrozenClock
+) -> None:
+    path = f"/consumption_load_curve/{PDL}/start/2026-09-08/end/2026-09-11"
+    mock.on(f"{path}/cache", json=readings())
+    mock.on(path, json=readings(("2026-09-08 00:30:00", 400)))
+    with gateway_client(mock, governor, clock, prefer_cache=True) as gateway:
+        assert gateway.load_curve(PDL, C, START, END) == []
+        assert len(gateway.load_curve(PDL, C, START, END, use_cache=False)) == 1
+    assert (mock.calls(f"{path}/cache"), mock.calls(path)) == (1, 1)
+
+
 def test_the_october_fall_back_keeps_both_repeated_hours(
     mock: HttpDouble, client: GatewayClient
 ) -> None:

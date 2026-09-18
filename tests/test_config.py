@@ -88,6 +88,21 @@ def test_an_explicit_file_must_exist(tmp_path: Path) -> None:
             ),
             "need different statistic ids",
         ),
+        (
+            (
+                f"usage_points:\n  - id: '{PDL}'\n    consumption: false\n"
+                "    consumption_detail: true\n"
+                "exporters:\n  home_assistant:\n    enabled: true\n    token: t\n"
+            ),
+            "usage_points[0]: consumption_detail needs consumption: true",
+        ),
+        (
+            (
+                f"usage_points:\n  - id: '{PDL}'\n    production_detail: true\n"
+                "exporters:\n  home_assistant:\n    enabled: true\n    token: t\n"
+            ),
+            "usage_points[0]: production_detail needs production: true",
+        ),
         ("gateway: [unclosed\n", "not valid YAML"),
     ],
 )
@@ -176,3 +191,9 @@ def test_a_config_file_in_the_working_directory_is_not_read_implicitly(
     path, must_exist = resolve_config_path(None)
     with pytest.raises(ConfigError, match="not read implicitly"):
         load_settings(path, must_exist=must_exist)
+
+
+def test_a_load_curve_alone_is_fine_without_home_assistant(tmp_path: Path) -> None:
+    text = f"usage_points:\n  - id: '{PDL}'\n    consumption: false\n    consumption_detail: true\n"
+    settings = load_settings(write(tmp_path, text), must_exist=True)
+    assert settings.usage_points[0].datasets == (Dataset.CURVE_CONSUMPTION,)

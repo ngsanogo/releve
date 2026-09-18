@@ -1,6 +1,6 @@
 # ADR 0006 — Home Assistant series: pinned boundary, hourly rows
 
-Date: 2026-09-13 · Status: accepted
+Date: 2026-09-13 · Status: accepted, amended by [ADR 0009](0009-partial-load-curve-days.md)
 
 ## Context
 
