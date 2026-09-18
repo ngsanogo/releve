@@ -91,6 +91,47 @@ def test_the_json_api(client: TestClient) -> None:
     ]
 
 
+def test_the_state_api_serves_what_mqtt_publishes(client: TestClient) -> None:
+    """The Home Assistant integration reads these three routes."""
+    assert client.get("/api/v1/usage-points").json() == [
+        {
+            "id": PDL,
+            "name": "Home",
+            "datasets": ["daily_consumption", "max_power"],
+            "last_success": "2026-09-12T10:00:00+00:00",
+        }
+    ]
+    assert client.get(f"/api/v1/usage-points/{PDL}/state").json() == {
+        "energy_yesterday_kwh": 6.028,
+        "energy_last_7_days_kwh": None,  # six days are missing: unknown, not a small week
+        "energy_last_30_days_kwh": None,
+        "latest_day": "2026-09-11",
+        "max_power_yesterday_va": 6100,
+    }
+    assert client.get("/api/v1/rte/state").json() == {
+        "day": "2026-09-12",
+        "tempo_today": "WHITE",
+        "ecowatt_today": 2,
+        "ecowatt_message": "tendu",
+        "tempo_days_left_blue": None,
+        "tempo_days_left_white": None,
+        "tempo_days_left_red": None,
+        "tempo_prices": None,
+    }
+    unknown = client.get("/api/v1/usage-points/99999999999999/state")
+    assert unknown.status_code == 404
+    assert unknown.json() == {"error": "unknown usage point"}
+
+
+def test_the_grid_state_is_absent_when_grid_signals_are_off(
+    database: Path, store: Store, governor: QuotaGovernor, clock: FrozenClock
+) -> None:
+    settings = make_settings(database, sync={"rte_signals": False})
+    answer = TestClient(create_app(settings, store, governor, clock=clock)).get("/api/v1/rte/state")
+    assert answer.status_code == 404
+    assert "disabled" in answer.json()["error"]
+
+
 @pytest.mark.parametrize(
     ("params", "error"),
     [
