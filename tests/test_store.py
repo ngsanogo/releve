@@ -53,6 +53,43 @@ def test_a_new_database_is_private_and_at_the_latest_schema(database: Path) -> N
     Store.open(database)  # reopening is a no-op
 
 
+def test_a_backup_is_a_checked_private_self_contained_copy(
+    database: Path, store: Store, tmp_path: Path
+) -> None:
+    store.set_ha_boundary(HaBoundary("archive:series", DAY, 8481.922), restart_sinks=None)
+    target = tmp_path / "backup.db"
+
+    store.backup(target)
+
+    assert target.stat().st_mode & 0o777 == 0o600
+    assert sorted(p.name for p in tmp_path.glob("backup.db*")) == ["backup.db"]  # no -wal, no -shm
+    # One file that opens read-only anywhere, which a copy left in WAL mode would not.
+    with closing(sqlite3.connect(f"{target.as_uri()}?mode=ro", uri=True)) as conn:
+        assert conn.execute("PRAGMA journal_mode").fetchone()[0] == "delete"
+        assert conn.execute("SELECT statistic_id FROM ha_boundary").fetchall() == [
+            ("archive:series",)
+        ]
+    with closing(sqlite3.connect(database)) as conn:
+        assert conn.execute("PRAGMA journal_mode").fetchone()[0] == "wal"  # the original: untouched
+    assert Store.open(target).ha_boundaries() == store.ha_boundaries()  # a restore just works
+
+
+def test_a_backup_never_overwrites_and_never_creates_a_database(
+    database: Path, store: Store, tmp_path: Path
+) -> None:
+    target = tmp_path / "backup.db"
+    target.write_text("precious")
+    with pytest.raises(StoreError, match="cannot write the backup"):
+        store.backup(target)
+    assert target.read_text() == "precious"
+
+    absent = Store(database.with_name("absent.db"))
+    with pytest.raises(StoreError, match="no database at"):
+        absent.backup(tmp_path / "other.db")
+    assert not absent.path.exists()
+    assert not (tmp_path / "other.db").exists()
+
+
 def test_a_database_from_the_future_is_refused(database: Path, store: Store) -> None:
     del store
     with closing(sqlite3.connect(database)) as conn, conn:

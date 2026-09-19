@@ -1,4 +1,4 @@
-# Tests of custom_components/releve against the Home Assistant core the Pi runs.
+# Tests of custom_components/releve against a real Home Assistant core.
 # pytest-homeassistant-custom-component pins homeassistant (0.13.365 = 2026.9.2).
 # Kept apart from uv.lock: Home Assistant pins its own versions of shared libraries.
 pytest-homeassistant-custom-component==0.13.365

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -13,7 +14,7 @@ from releve.cli import EXIT_BUSY, EXIT_CONFIG, EXIT_FAILURES, EXIT_OK, main
 from releve.clock import paris_today, utc_now
 from releve.config import default_config_path
 from releve.gateway import GatewayClient
-from releve.store import Store
+from releve.store import HaBoundary, Store
 from releve.sync import exclusive_pass
 from tests.conftest import PDL
 from tests.fakes import HttpDouble
@@ -134,7 +135,7 @@ def test_ha_boundary_show_and_set(tmp_path: Path, capsys: pytest.CaptureFixture[
     assert main(["ha-boundary", "-c", path]) == EXIT_OK
     out = capsys.readouterr().out
     assert "archive:series: owned after 2026-08-28, from 8481.922 kWh, for the next" in out
-    assert "archive:fresh: owned after its start, from 0.0 kWh" in out
+    assert "archive:fresh: owned after its start, from 0.000 kWh" in out
     assert (
         main(["ha-boundary", "-c", path, "--set", "archive:series", "yesterday", "1"])
         == EXIT_CONFIG
@@ -150,6 +151,7 @@ def test_serve_runs_the_web_interface_with_a_scheduler(
         served.update(options, app=app)
 
     monkeypatch.setattr("releve.cli.uvicorn.run", fake_uvicorn_run)
+    caplog.set_level(logging.INFO)
     path = config(tmp_path)
     path.write_text(path.read_text() + "web:\n  host: 0.0.0.0\n", encoding="utf-8")
 
@@ -158,4 +160,31 @@ def test_serve_runs_the_web_interface_with_a_scheduler(
     assert served["host"] == "0.0.0.0"  # noqa: S104 — what the configuration asked for
     assert served["log_config"] is None
     assert served["app"].routes
-    assert "without web.auth_token" in caplog.text
+    # Said once, at the level of a fact: the image always listens on 0.0.0.0, and
+    # there the published port decides who reaches it — releve cannot know.
+    (start,) = [r for r in caplog.records if r.name == "releve.cli"]
+    assert start.levelno == logging.INFO
+    assert "http://0.0.0.0:8080 (no authentication" in start.getMessage()
+
+
+def test_backup_copies_the_database_without_touching_it(
+    tmp_path: Path, capfdbinary: pytest.CaptureFixture[bytes]
+) -> None:
+    path = str(config(tmp_path))
+    assert main(["backup", "-c", path, str(tmp_path / "early.db")]) == EXIT_CONFIG  # no database
+    assert not (tmp_path / "cache.db").exists()  # and a backup never creates one
+
+    Store.open(tmp_path / "cache.db").set_ha_boundary(
+        HaBoundary("archive:series", TODAY, 8481.922), restart_sinks=None
+    )
+    copy = tmp_path / "copy.db"
+    assert main(["backup", "-c", path, str(copy)]) == EXIT_OK
+    assert copy.stat().st_mode & 0o777 == 0o600
+    assert Store.open(copy).ha_boundaries() == Store.open(tmp_path / "cache.db").ha_boundaries()
+    assert main(["backup", "-c", path, str(copy)]) == EXIT_CONFIG  # never overwrites
+
+    capfdbinary.readouterr()
+    assert main(["backup", "-c", path, "-"]) == EXIT_OK
+    streamed = capfdbinary.readouterr().out
+    assert streamed.startswith(b"SQLite format 3\x00")
+    assert len(streamed) == copy.stat().st_size

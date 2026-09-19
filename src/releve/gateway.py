@@ -34,7 +34,7 @@ from typing import Any, Protocol, Self
 
 import httpx2
 
-from releve.clock import PARIS, Clock, next_utc_midnight, utc_now
+from releve.clock import PARIS, Clock, format_paris, next_utc_midnight, utc_now
 from releve.config import GatewaySettings
 from releve.domain import (
     Address,
@@ -60,6 +60,7 @@ from releve.errors import (
     AuthError,
     GatewayError,
     GatewayUnreachableError,
+    NotFoundError,
     ThrottledError,
     WindowRejectedError,
 )
@@ -317,7 +318,7 @@ class GatewayClient:
             )
             self._governor.block(bucket, retry_at, f"throttled upstream on {endpoint}")
             raise ThrottledError(
-                f"{endpoint}: throttled upstream until {retry_at:%Y-%m-%d %H:%M} UTC", retry_at
+                f"{endpoint}: throttled upstream until {format_paris(retry_at)} (Paris)", retry_at
             )
         if status == 409:
             retry_at = next_utc_midnight(self._clock())
@@ -325,8 +326,10 @@ class GatewayClient:
             raise ThrottledError(f"{endpoint}: the gateway's daily quota is spent", retry_at)
         # The body stays out of errors and the journal (it may echo personal data).
         log.debug("%s: HTTP %d body: %.500s", endpoint, status, response.text)
-        if status in (400, 404):
-            raise WindowRejectedError(f"{endpoint}: the gateway refused the window (HTTP {status})")
+        if status == 400:
+            raise WindowRejectedError(f"{endpoint}: the gateway refused the window (HTTP 400)")
+        if status == 404:
+            raise NotFoundError(f"{endpoint}: the gateway holds nothing for it (HTTP 404)")
         raise GatewayError(f"{endpoint}: unexpected HTTP {status}")
 
 

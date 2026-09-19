@@ -17,6 +17,7 @@ from releve.errors import (
     AuthError,
     GatewayError,
     GatewayUnreachableError,
+    NotFoundError,
     QuotaExhaustedError,
     ThrottledError,
     WindowRejectedError,
@@ -218,13 +219,16 @@ def test_transport_failures_and_odd_answers_are_typed_and_still_counted(
     mock.on(DAILY_PATH, text="<html>maintenance</html>")
     with pytest.raises(GatewayError, match="without a JSON body"):
         client.daily(PDL, C, START, END)
-    mock.on(DAILY_PATH, status=404, text="no data")
+    mock.on(DAILY_PATH, status=400, text="bad window")
     with pytest.raises(WindowRejectedError, match="refused the window"):
+        client.daily(PDL, C, START, END)
+    mock.on(DAILY_PATH, status=404, text="no data")
+    with pytest.raises(NotFoundError, match="holds nothing"):
         client.daily(PDL, C, START, END)
     mock.on(DAILY_PATH, status=502, text="bad gateway")
     with pytest.raises(GatewayError, match=r"unexpected HTTP 502$"):
         client.daily(PDL, C, START, END)
-    assert governor.usage(PDL).used == 4
+    assert governor.usage(PDL).used == 5
 
 
 @pytest.mark.parametrize(

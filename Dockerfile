@@ -33,9 +33,11 @@ RUN useradd --create-home --uid 1000 app \
 
 # The venv's scripts embed /app/.venv: same path as in the build stage.
 COPY --from=build /app/.venv /app/.venv
+# TZ: releve states every instant in Paris time (Enedis counts Paris days); so does its log.
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
+    TZ=Europe/Paris \
     RELEVE_CONFIG=/home/app/config.yaml \
     RELEVE_DEFAULT_DATABASE=/home/app/data/releve.db \
     RELEVE_WEB__HOST=0.0.0.0

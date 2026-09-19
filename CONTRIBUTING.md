@@ -46,9 +46,9 @@ MQTT_TEST_BROKER=127.0.0.1:1883 uv run pytest tests/test_exporter_mqtt.py
 ## Releases
 
 1. Set `version` in `pyproject.toml` and `custom_components/releve/manifest.json`,
-   run `uv lock`, and turn `[Unreleased]` in `CHANGELOG.md` into
-   `[X.Y.Z] - YYYY-MM-DD`. For a final release, also set the tag in the
-   `uv tool install` line of `README.md`.
+   the pinned tag in `README.md` and `docker-compose.yaml`, run `uv lock`, and
+   turn `[Unreleased]` in `CHANGELOG.md` into `[X.Y.Z] - YYYY-MM-DD`. A test
+   holds all of them equal to the project version.
 2. Tag `vX.Y.Z` (or `vX.Y.Z-rc.N`) on `main` and push the tag.
 3. The release workflow reruns CI, checks the tag against the version, pushes
    the multi-arch image to GHCR and creates the GitHub release with the wheel

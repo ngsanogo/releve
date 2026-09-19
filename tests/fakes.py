@@ -37,6 +37,7 @@ from releve.domain import (
 from releve.errors import (
     AuthError,
     GatewayUnreachableError,
+    NotFoundError,
     ThrottledError,
     WindowRejectedError,
 )
@@ -75,7 +76,8 @@ class FakeGateway:
     throttled_curves: bool = False
     refused_usage_points: set[str] = field(default_factory=set)
     unreachable: bool = False
-    refused_windows: set[date] = field(default_factory=set)
+    refused_windows: set[date] = field(default_factory=set)  # answered 400
+    unpublished_windows: set[date] = field(default_factory=set)  # answered 404
     consent_valid: bool = True
     consent_banned: bool = False
     calls: list[Call] = field(default_factory=list)
@@ -93,7 +95,9 @@ class FakeGateway:
         if self.unreachable:
             raise GatewayUnreachableError(f"{endpoint}: no answer from the gateway (refused)")
         if start is not None and start in self.refused_windows:
-            raise WindowRejectedError(f"{endpoint}: the gateway refused the window (HTTP 404)")
+            raise WindowRejectedError(f"{endpoint}: the gateway refused the window (HTTP 400)")
+        if start is not None and start in self.unpublished_windows:
+            raise NotFoundError(f"{endpoint}: the gateway holds nothing for it (HTTP 404)")
 
     def _available(self, start: date, end: date) -> list[date]:
         return [d for d in days(start, end) if d < self.published_until and d not in self.holes]

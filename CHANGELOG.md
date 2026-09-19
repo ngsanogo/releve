@@ -6,13 +6,41 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-19
+
+This release has a schema migration (version 3): take a `releve backup` first —
+with 0.2.0, which has no such command, stop releve and copy the database file.
+
 ### Added
+- `releve backup DEST`: a consistent copy of the database through SQLite's
+  backup API, safe while the daemon runs, checked with `PRAGMA integrity_check`,
+  private (0600), never overwriting, and changing nothing in the database. `-`
+  streams it to standard output (`docker exec releve releve backup - > copy.db`).
+  The README says how to back up, restore and upgrade
+  ([ADR 0011](docs/adr/0011-operated-from-its-own-commands.md)).
 - Load-curve points dropped from the cache are journaled (schema version 3).
   Home Assistant rewrites their day, and the InfluxDB exporter deletes them
   through `/api/v2/delete`. A destination without that endpoint, such as
   VictoriaMetrics, is reported in the export summary.
 
 ### Changed
+- Recent days the gateway holds nothing for yet (HTTP 404) are no longer a
+  failure: the outcome succeeds and says `(not published yet)`, and the next
+  pass asks again. Observed live, this was the first pass of every night. A
+  refused window (HTTP 400) on recent days stays a failure; settled days become
+  confirmed gaps either way.
+- Retry times in messages are in Paris time and say so (`throttled upstream
+  until 2026-09-19 11:00 (Paris)`), like every other instant releve shows; they
+  were in UTC next to Paris event times. The image sets `TZ=Europe/Paris`, so
+  the log agrees with them.
+- The daemon no longer warns at every start when it listens beyond loopback
+  without `web.auth_token` — the image always does, and there the published
+  port decides. One line states it instead, as `releve check` does:
+  `releve 0.3.0 — http://0.0.0.0:8080 (no authentication: open to whoever reaches it)`.
+- The Home Assistant integration and the server no longer have to run the same
+  version: `/api/v1` is their contract, and either side can be upgraded alone.
+- `docker-compose.yaml` and the README pin the current release instead of
+  `:latest`; a test keeps them equal to the project version.
 - Partially published load-curve days ride along in windows planned for missing
   days: they cost no call of their own, skip the gateway's cache, and no longer
   count among the days still to fetch in `releve status`, the dashboard and
@@ -85,6 +113,7 @@ First release.
 - One-way import of databases in the earlier SQLAlchemy layout, with a backup.
 - Container image for amd64 and arm64.
 
-[Unreleased]: https://github.com/ngsanogo/releve/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/ngsanogo/releve/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/ngsanogo/releve/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ngsanogo/releve/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/ngsanogo/releve/releases/tag/v0.1.0
