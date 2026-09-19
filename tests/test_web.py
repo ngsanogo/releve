@@ -234,7 +234,7 @@ def test_hourly_ecowatt_is_served_per_paris_day(
 def test_the_usage_point_page_shows_customer_data_that_could_not_be_fetched(
     database: Path, store: Store, governor: QuotaGovernor, clock: FrozenClock
 ) -> None:
-    detail = "identity: the gateway refused the window (HTTP 404)"
+    detail = "identity: the gateway holds nothing for it (HTTP 404)"
     store.record_customer_failure(PDL, CustomerResource.IDENTITY, at=NOW, detail=detail)
     for enabled in (True, False):
         settings = make_settings(database, usage_points=[{"id": PDL, "identity": enabled}])

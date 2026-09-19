@@ -90,3 +90,4 @@ The ADRs record why things are the way they are:
 - [0008 — Hand-rolled Prometheus exposition](adr/0008-hand-rolled-prometheus.md)
 - [0009 — Partially published load-curve days](adr/0009-partial-load-curve-days.md)
 - [0010 — A Home Assistant integration over the JSON API](adr/0010-home-assistant-integration.md)
+- [0011 — Operated from its own commands, coupled by its API](adr/0011-operated-from-its-own-commands.md)

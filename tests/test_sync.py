@@ -9,7 +9,7 @@ import pytest
 
 from releve.config import Settings
 from releve.domain import Contract, CustomerResource, Dataset, Direction, Identity
-from releve.errors import ExportError, SyncAlreadyRunningError, WindowRejectedError
+from releve.errors import ExportError, NotFoundError, SyncAlreadyRunningError
 from releve.planning import SETTLE_DAYS
 from releve.quota import QuotaGovernor
 from releve.store import Store
@@ -361,7 +361,7 @@ def test_a_failing_customer_resource_does_not_block_the_others(
 
     def refused(usage_point: str) -> Contract:
         del usage_point
-        raise WindowRejectedError("contracts: the gateway refused the window (HTTP 404)")
+        raise NotFoundError("contracts: the gateway holds nothing for it (HTTP 404)")
 
     gateway.contract = refused  # type: ignore[method-assign]
     (outcome,) = run_pass(settings, gateway, store, [], clock).outcomes
@@ -383,12 +383,12 @@ def test_a_failing_customer_resource_is_asked_again_a_day_later_not_every_pass(
 
     def refused(usage_point: str) -> Identity:
         gateway.calls.append((usage_point, "identity", None, None))
-        raise WindowRejectedError("identity: the gateway refused the window (HTTP 404)")
+        raise NotFoundError("identity: the gateway holds nothing for it (HTTP 404)")
 
     gateway.identity = refused  # type: ignore[method-assign]
     (first,) = run_pass(settings, gateway, store, [], clock).outcomes
     assert not first.ok
-    assert "refused" in store.customer_failures(PDL)[CustomerResource.IDENTITY].detail
+    assert "holds nothing" in store.customer_failures(PDL)[CustomerResource.IDENTITY].detail
 
     for _ in range(5):  # the rest of the day: nothing is due, nothing is asked
         clock.advance(timedelta(hours=4))
@@ -533,6 +533,51 @@ def test_a_refused_recent_window_is_reported_after_the_others(
     assert "refused the window" in outcome.detail
     remaining = backlog(store, PDL, Dataset.CURVE_CONSUMPTION, 14, TODAY)
     assert remaining == [TODAY - timedelta(days=n) for n in range(1, 8)]
+
+
+def test_recent_days_not_published_yet_are_awaited_not_failed(
+    database: Path, store: Store, governor: QuotaGovernor, clock: FrozenClock
+) -> None:
+    """Observed live: before Enedis publishes yesterday, the gateway answers 404 every night."""
+    settings = make_settings(
+        database,
+        usage_points=[
+            {"id": PDL, "consumption": False, "consumption_detail": True, "contract": False}
+        ],
+        sync={"history_days": 14},
+    )
+    recent = TODAY - timedelta(days=7)
+    gateway = gateway_for(governor, clock, unpublished_windows={recent})
+
+    (outcome,) = run_pass(settings, gateway, store, [], clock).outcomes
+
+    assert outcome.ok
+    assert "curve_consumption +" in outcome.detail
+    assert outcome.detail.endswith("(not published yet)")
+    assert store.confirmed_gaps(PDL, Dataset.CURVE_CONSUMPTION, date.min, date.max) == set()
+    remaining = backlog(store, PDL, Dataset.CURVE_CONSUMPTION, 14, TODAY)
+    assert remaining == [TODAY - timedelta(days=n) for n in range(1, 8)]  # asked again next pass
+
+
+def test_settled_days_the_gateway_holds_nothing_for_become_gaps(
+    database: Path, store: Store, governor: QuotaGovernor, clock: FrozenClock
+) -> None:
+    settings = make_settings(
+        database,
+        usage_points=[
+            {"id": PDL, "consumption": False, "consumption_detail": True, "contract": False}
+        ],
+        sync={"history_days": 30},
+    )
+    old_window_start = TODAY - timedelta(days=21)
+    gateway = gateway_for(governor, clock, unpublished_windows={old_window_start})
+
+    (outcome,) = run_pass(settings, gateway, store, [], clock).outcomes
+
+    assert outcome.ok
+    assert "not published yet" not in outcome.detail
+    gaps = store.confirmed_gaps(PDL, Dataset.CURVE_CONSUMPTION, date.min, date.max)
+    assert gaps == {old_window_start + timedelta(days=n) for n in range(7)}
 
 
 def test_a_refused_window_stretched_to_a_partial_day_still_settles_its_missing_days(

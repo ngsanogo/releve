@@ -6,6 +6,7 @@
     releve status        freshness, backlog, quota and exports
     releve serve         the daemon: a sync pass every interval, plus the web interface
     releve ha-boundary   show or set where Home Assistant series begin
+    releve backup        write a consistent copy of the database
     releve purge-cache   delete MyElectricalData's remote cache for a usage point
     releve version
 
@@ -22,7 +23,9 @@ import argparse
 import logging
 import os
 import re
+import shutil
 import sys
+import tempfile
 from collections.abc import Callable, Sequence
 from datetime import date, timedelta
 from pathlib import Path
@@ -33,6 +36,7 @@ from releve import __version__
 from releve.clock import format_paris, paris_today, utc_now
 from releve.config import (
     Settings,
+    WebSettings,
     example_config,
     load_settings,
     resolve_config_path,
@@ -115,6 +119,19 @@ def _parser() -> argparse.ArgumentParser:
     )
     boundary.set_defaults(handler=_ha_boundary)
 
+    backup = commands.add_parser(
+        "backup",
+        parents=[common],
+        help="write a consistent copy of the database",
+        description=(
+            "Copies the database through SQLite's backup API, so it is safe while the daemon "
+            "runs, and checks the copy. To restore: stop releve, put the copy at storage.path, "
+            "start releve."
+        ),
+    )
+    backup.add_argument("destination", help="a file that does not exist yet, or - for stdout")
+    backup.set_defaults(handler=_backup)
+
     purge = commands.add_parser(
         "purge-cache",
         parents=[common],
@@ -194,8 +211,8 @@ def _check(args: argparse.Namespace) -> int:
         f"influxdb → {exporters.influxdb.url}" if exporters.influxdb.enabled else "",
     ]
     print(f"exporters     : {', '.join(filter(None, destinations)) or 'none'}")
-    auth = "token required" if settings.web.auth_token else "no authentication"
-    print(f"web           : http://{settings.web.host}:{settings.web.port} ({auth})")
+    web = settings.web
+    print(f"web           : http://{web.host}:{web.port} ({_auth(web)})")
     settings.require_runnable()
     print("✔ ready")
     return EXIT_OK
@@ -266,14 +283,8 @@ def _serve(args: argparse.Namespace) -> int:
 
         scheduler = Scheduler(one_pass, timedelta(hours=settings.sync.interval_hours))
         web = settings.web
-        if web.host not in ("127.0.0.1", "::1", "localhost") and web.auth_token is None:
-            log.warning(
-                "the web interface listens on %s without web.auth_token: "
-                "anyone who reaches the port can read your consumption history",
-                web.host,
-            )
         scheduler.start()
-        log.info("releve %s — http://%s:%d", __version__, web.host, web.port)
+        log.info("releve %s — http://%s:%d (%s)", __version__, web.host, web.port, _auth(web))
         try:
             uvicorn.run(
                 create_app(settings, store, governor, scheduler),
@@ -299,7 +310,8 @@ def _ha_boundary(args: argparse.Namespace) -> int:
             raise ConfigError(f"invalid boundary: {exc}") from exc
         store.set_ha_boundary(HaBoundary(statistic_id, day, total), restart_sinks=HA_SINK_PREFIX)
         print(
-            f"pinned {statistic_id}: owned after {day or 'its start'}, continuing from {total} kWh;"
+            f"pinned {statistic_id}: owned after {day or 'its start'}, "
+            f"continuing from {total:.3f} kWh;"
             " the next Home Assistant export rewrites everything after it"
         )
         return EXIT_OK
@@ -308,11 +320,25 @@ def _ha_boundary(args: argparse.Namespace) -> int:
         after = boundary.base_day or "its start"
         owner = boundary.usage_point or "the next usage point exporting to it"
         print(
-            f"{boundary.statistic_id}: owned after {after}, from {boundary.base_sum_kwh} kWh,"
+            f"{boundary.statistic_id}: owned after {after}, from {boundary.base_sum_kwh:.3f} kWh,"
             f" for {owner}"
         )
     if not boundaries:
         print("no boundary pinned yet — the first export pins one per series")
+    return EXIT_OK
+
+
+def _backup(args: argparse.Namespace) -> int:
+    store = Store(_settings(args).storage.path)  # not Store.open: a backup changes nothing
+    if args.destination != "-":
+        store.backup(Path(args.destination))
+        print(f"✔ {store.path} copied to {args.destination}")
+        return EXIT_OK
+    with tempfile.TemporaryDirectory() as folder:
+        copy = Path(folder) / store.path.name
+        store.backup(copy)
+        with copy.open("rb") as handle:
+            shutil.copyfileobj(handle, sys.stdout.buffer)
     return EXIT_OK
 
 
@@ -346,6 +372,11 @@ def _settings(args: argparse.Namespace) -> Settings:
         format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
     )
     return settings
+
+
+def _auth(web: WebSettings) -> str:
+    """Who may read the web interface — said by `check` and at every start of the daemon."""
+    return "token required" if web.auth_token else "no authentication: open to whoever reaches it"
 
 
 def _print_report(report: PassReport) -> None:

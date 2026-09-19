@@ -11,6 +11,8 @@ The rules a pass lives by:
   on every pass;
 * a load-curve day published only partially is asked again until it is settled,
   but only inside a call made for a missing day, and past the gateway's cache;
+* recent days the gateway holds nothing for yet are not a failure: Enedis has
+  not published them, and the next pass asks again;
 * every answer is cached before any exporter runs; exporters read the cache
   from where they last stopped, so a failed delivery is retried, not lost;
 * every outcome, success or failure, is journaled.
@@ -36,6 +38,7 @@ from releve.errors import (
     ExportError,
     GatewayError,
     GatewayUnreachableError,
+    NotFoundError,
     RetryLaterError,
     SyncAlreadyRunningError,
     WindowRejectedError,
@@ -75,6 +78,17 @@ class Outcome:
     subject: str
     ok: bool
     detail: str
+
+
+@dataclass(frozen=True, slots=True)
+class Fetched:
+    """What fetching one dataset did: cached rows changed, and whether recent days are awaited."""
+
+    changed: int
+    awaiting_publication: bool
+
+    def __str__(self) -> str:
+        return f"+{self.changed}" + (" (not published yet)" if self.awaiting_publication else "")
 
 
 @dataclass(frozen=True, slots=True)
@@ -202,7 +216,7 @@ def sync_usage_point(
 
     for dataset, missing in todo.items():
         try:
-            changed = sync_dataset(
+            fetched = sync_dataset(
                 usage_point.id, dataset, missing, history_days, gateway, store, run_id, today
             )
         except (RetryLaterError, AuthError, GatewayUnreachableError) as exc:
@@ -211,7 +225,7 @@ def sync_usage_point(
         except GatewayError as exc:
             problems.append(str(exc))
             continue
-        changes.append(f"{dataset} +{changed}")
+        changes.append(f"{dataset} {fetched}")
     detail = "; ".join(filter(None, [", ".join(changes), *problems])) or "nothing to fetch"
     return Outcome(usage_point.id, not problems, detail)
 
@@ -312,29 +326,38 @@ def sync_dataset(
     store: Store,
     run_id: int,
     today: date,
-) -> int:
-    """Fetch the `missing` days of `dataset` (see `backlog`); returns how many cached rows changed.
+) -> Fetched:
+    """Fetch the `missing` days of `dataset` (see `backlog`).
 
     Partial load-curve days ride along (see `partial_days`). A window holding one
     skips the gateway's cache: its copy of that day may be the same partial answer.
 
-    A window the gateway explicitly refuses is skipped: when all the missing days
-    it holds are settled (typically before the meter's activation or beyond what
-    Enedis keeps), they become confirmed gaps; otherwise the refusal is raised
-    once the other windows are done.
+    A window the gateway holds nothing for (404) or refuses (400) is skipped. When
+    all the missing days it holds are settled (typically before the meter's
+    activation or beyond what Enedis keeps), they become confirmed gaps. Otherwise
+    a 404 means Enedis has not published them yet (observed live: every night,
+    until the morning) and the next pass asks again, while a 400 is raised once
+    the other windows are done.
     """
     partial = partial_days(store, usage_point, dataset, history_days, today) if missing else set()
     changed = 0
+    awaiting_publication = False
     refused: WindowRejectedError | None = None
     for start, end in plan_windows(missing, dataset.window_days, refresh=partial):
         asked = [day for day in missing if start <= day < end]
         use_cache = not any(start <= day < end for day in partial)
+        settled = max(asked) <= today - timedelta(days=SETTLE_DAYS)
         try:
             delivered, window_changes = _fetch_window(
                 dataset, usage_point, start, end, gateway, store, run_id, use_cache=use_cache
             )
+        except NotFoundError:
+            if not settled:
+                awaiting_publication = True
+                continue
+            delivered, window_changes = set(), 0
         except WindowRejectedError as exc:
-            if max(asked) > today - timedelta(days=SETTLE_DAYS):
+            if not settled:
                 refused = exc
                 continue
             delivered, window_changes = set(), 0
@@ -342,7 +365,7 @@ def sync_dataset(
         store.add_confirmed_gaps(usage_point, dataset, settled_gaps(asked, delivered, today))
     if refused is not None:
         raise refused
-    return changed
+    return Fetched(changed, awaiting_publication)
 
 
 def _fetch_window(

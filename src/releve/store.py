@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import fcntl
 import logging
+import os
 import re
 import sqlite3
 from collections.abc import Iterable, Iterator
@@ -236,10 +237,36 @@ class Store:
         if existing:
             return existing[0]
         target = self.path.with_name(f"{self.path.name}.pre-migration-{now:%Y%m%dT%H%M%SZ}.bak")
-        with self._connect() as source, closing(sqlite3.connect(target)) as copy:
-            source.backup(copy)
-        target.chmod(0o600)
+        self.backup(target)
         return target
+
+    def backup(self, target: Path) -> None:
+        """Write a consistent, checked copy of the database to `target`, which must not exist.
+
+        SQLite's backup API reads one snapshot even while the daemon writes; copying
+        the files of a database open in WAL mode guarantees nothing. The copy is a
+        single self-contained file (no `-wal` beside it), private like the original,
+        and kept only if `PRAGMA integrity_check` passes on it. The database itself
+        is never changed: no migration runs here, so a copy can be taken before an
+        upgrade.
+        """
+        if not self.path.is_file():
+            raise StoreError(f"no database at {self.path}")
+        try:
+            os.close(os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600))
+        except OSError as exc:
+            raise StoreError(f"cannot write the backup {target}: {exc}") from exc
+        try:
+            with self._connect() as source, closing(sqlite3.connect(target)) as copy:
+                source.backup(copy)
+                copy.execute("PRAGMA journal_mode = DELETE")
+                verdict = [row[0] for row in copy.execute("PRAGMA integrity_check")]
+        except (OSError, sqlite3.Error) as exc:
+            target.unlink(missing_ok=True)
+            raise StoreError(f"cannot back up {self.path}: {exc}") from exc
+        if verdict != ["ok"]:
+            target.unlink(missing_ok=True)
+            raise StoreError(f"the backup of {self.path} is corrupt: {'; '.join(verdict[:3])}")
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
