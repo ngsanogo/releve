@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from releve.clock import Clock, next_utc_midnight, utc_midnight, utc_now
+from releve.clock import Clock, format_paris, next_utc_midnight, utc_midnight, utc_now
 from releve.errors import QuotaExhaustedError
 from releve.store import QuotaUsage, Refusal, Store
 
@@ -45,7 +45,7 @@ class QuotaGovernor:
         if isinstance(outcome, Refusal):
             raise QuotaExhaustedError(
                 f"{bucket}: {outcome.cause}; "
-                f"next call allowed at {outcome.until:%Y-%m-%d %H:%M} UTC",
+                f"next call allowed at {format_paris(outcome.until)} (Paris)",
                 retry_at=outcome.until,
             )
         return outcome

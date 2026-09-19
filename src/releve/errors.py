@@ -34,7 +34,11 @@ class GatewayUnreachableError(GatewayError):
 
 
 class WindowRejectedError(GatewayError):
-    """The gateway refused the requested date window itself (HTTP 400 or 404)."""
+    """The gateway refused the requested date window itself (HTTP 400)."""
+
+
+class NotFoundError(GatewayError):
+    """The gateway holds nothing for the request (HTTP 404): not published yet, or never."""
 
 
 class AuthError(GatewayError):

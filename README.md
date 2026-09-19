@@ -61,7 +61,7 @@ history without extra hardware.
 With Docker (amd64 and arm64 images):
 
 ```bash
-docker run --rm ghcr.io/ngsanogo/releve:latest init --stdout > config.yaml
+docker run --rm ghcr.io/ngsanogo/releve:v0.3.0 init --stdout > config.yaml
 chmod 600 config.yaml            # then set gateway.token and your PDL
 docker compose up -d             # see docker-compose.yaml
 ```
@@ -69,7 +69,7 @@ docker compose up -d             # see docker-compose.yaml
 Or with Python 3.12+:
 
 ```bash
-uv tool install git+https://github.com/ngsanogo/releve@v0.2.0
+uv tool install git+https://github.com/ngsanogo/releve@v0.3.0
 releve init                      # writes ~/.config/releve/config.yaml
 $EDITOR ~/.config/releve/config.yaml   # set gateway.token and your PDL
 releve check                     # explains the configuration
@@ -152,10 +152,11 @@ address (for instance `http://127.0.0.1:8080` on the same host) and its
 `web.auth_token` if it has one. A refused token opens a re-authentication
 prompt.
 
-The integration and the releve server share their version: install the release
-matching the server. Long-term statistics for the Energy dashboard stay with
-the [`home_assistant` exporter](#home-assistant) — the integration's rolling
-totals are deliberately not statistics.
+The integration only reads releve's `/api/v1`: that API is the contract between
+the two, not their version. HACS offers each new release; take it when it comes,
+whatever version the server runs. Long-term statistics for the Energy dashboard
+stay with the [`home_assistant` exporter](#home-assistant) — the integration's
+rolling totals are deliberately not statistics.
 
 ## Web interface and API
 
@@ -182,6 +183,29 @@ authentication so browsers work too.
 An importable Grafana dashboard for the Influx exporter lives in
 [`contrib/grafana/releve-influx.json`](contrib/grafana/releve-influx.json).
 
+## Backup, restore, upgrade
+
+Everything releve knows is in one SQLite file. Most of it can be fetched again,
+under the quota and as far back as Enedis keeps it; the Home Assistant series
+boundaries cannot. `releve backup` copies the file safely while the daemon
+runs — a plain `cp` of a live SQLite database proves nothing — and checks the
+copy before keeping it:
+
+```bash
+releve backup /backups/releve-$(date +%F).db               # never overwrites
+docker exec releve releve backup - > releve-$(date +%F).db  # from a container
+```
+
+To **restore**: stop releve, put the copy at `storage.path` (in the container:
+`/home/app/data/releve.db`), remove any `releve.db-wal` and `releve.db-shm` left
+beside it, start releve.
+
+To **upgrade**: take a backup, then move to the new version — change the pinned
+image tag and `docker compose up -d`, or `uv tool install` the new tag. A schema
+migration runs by itself at the first start, in one transaction, and only goes
+forward: the backup is the way back. The [changelog](CHANGELOG.md) says when a
+release has one.
+
 ## Command line
 
 ```
@@ -191,6 +215,7 @@ releve sync          run one sync pass now
 releve status        freshness, days still to fetch, quota, exports
 releve serve         the daemon and the web interface
 releve ha-boundary   show or set Home Assistant series boundaries
+releve backup        write a consistent copy of the database
 releve purge-cache   delete MyElectricalData's remote cache for a PDL
 releve version
 ```
