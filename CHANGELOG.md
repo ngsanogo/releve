@@ -6,7 +6,21 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-09-19
+
+The first release published since 0.2.0. 0.3.0 was tagged but never published:
+a test of the Home Assistant integration failed about one run in eight and
+stopped its release, and a tag does not move. 0.3.1 is 0.3.0 with that test
+fixed — what changed for users, schema migration included, is listed under 0.3.0.
+
+### Fixed
+- The integration's reauthentication test waits for the reload a successful
+  reauthentication schedules, and checks the entry comes up with the new token.
+  It ended while Home Assistant was still reloading, which left a timer behind.
+
 ## [0.3.0] - 2026-09-19
+
+Tagged, not published — see 0.3.1.
 
 This release has a schema migration (version 3): take a `releve backup` first —
 with 0.2.0, which has no such command, stop releve and copy the database file.
@@ -113,7 +127,8 @@ First release.
 - One-way import of databases in the earlier SQLAlchemy layout, with a backup.
 - Container image for amd64 and arm64.
 
-[Unreleased]: https://github.com/ngsanogo/releve/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/ngsanogo/releve/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/ngsanogo/releve/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/ngsanogo/releve/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ngsanogo/releve/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/ngsanogo/releve/releases/tag/v0.1.0
