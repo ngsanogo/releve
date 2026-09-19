@@ -86,3 +86,7 @@ async def test_reauth_replaces_the_token(hass: HomeAssistant, releve_api: Serve)
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reauth_successful"
     assert entry.data == {CONF_URL: URL, CONF_TOKEN: "new"}
+    # A successful reauth schedules a reload. Wait for it: the entry must come up with the
+    # new token — and a test that ends while it reloads leaves its timers behind.
+    await hass.async_block_till_done()
+    assert entry.state is config_entries.ConfigEntryState.LOADED
