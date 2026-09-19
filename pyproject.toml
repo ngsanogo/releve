@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "releve"
-version = "0.3.0"
+version = "0.3.1"
 description = "Self-hosted, quota-aware cache of French electricity meter readings, with Home Assistant, MQTT and InfluxDB/VictoriaMetrics exports."
 readme = "README.md"
 requires-python = ">=3.12"
