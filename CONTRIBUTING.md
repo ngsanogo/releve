@@ -5,29 +5,29 @@ Merci ! / Thanks! Issues and pull requests are welcome, in English or French.
 ## Getting started
 
 ```bash
-uv sync                                    # dependencies, including the dev group
-uvx pre-commit install                     # ruff and gitleaks before each commit
-uv run pytest --cov                        # tests (CI expects 90% coverage)
-uv run mypy                                # strict, sources and tests
-uv run ruff check src tests custom_components tests_ha
-uv run ruff format --check src tests custom_components tests_ha
+make setup      # dependencies, the Home Assistant environment, the pre-commit hooks
+make check      # everything CI checks, in CI's order
 ```
 
-The Home Assistant integration uses its own environment (Home Assistant pins
-its libraries):
+`make help` lists the rest. Every target mirrors one job of
+`.github/workflows/ci.yml`, so green here and green there mean the same thing —
+which is why these commands are a Makefile rather than a list to copy from a
+page that drifts from the workflow.
 
-```bash
-uv venv --python 3.14 --allow-existing .venv-ha && uv pip install --python .venv-ha -r tests_ha/requirements.txt
-.venv-ha/bin/python -m mypy --config-file tests_ha/mypy.ini custom_components/releve
-(cd tests_ha && ../.venv-ha/bin/python -m pytest)
-```
+| Target | The CI job it mirrors |
+| --------- | ------------------------------------------------------------- |
+| `lint` | `lint` — ruff's rules and formatting, checked, not applied |
+| `typecheck` | `lint` — mypy, strict, over the sources and the tests |
+| `test` | `test` — pytest with coverage, against a throwaway MQTT broker |
+| `test-ha` | `home-assistant` — minus hassfest and HACS, which are actions |
+| `audit` | `audit` — known vulnerabilities in the locked production set |
+| `package` | `package` — the wheel, used from an environment that has nothing else |
+| `image` | `image` — one architecture here, two on the runner |
+| `secrets` | `secrets` — the same gitleaks version |
 
-The MQTT integration test needs a broker:
-
-```bash
-docker run --rm -d -p 127.0.0.1:1883:1883 eclipse-mosquitto:2 mosquitto -c /mosquitto-no-auth.conf
-MQTT_TEST_BROKER=127.0.0.1:1883 uv run pytest tests/test_exporter_mqtt.py
-```
+`make test` starts the MQTT broker itself and removes it afterwards. That
+matters: `tests/test_exporter_mqtt.py` is the one test that proves the exporter
+really speaks MQTT, and without a broker it *skips*, which reads as a pass.
 
 ## Conventions
 
