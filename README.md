@@ -63,7 +63,25 @@ With Docker (amd64 and arm64 images):
 ```bash
 docker run --rm ghcr.io/ngsanogo/releve:v0.3.1 init --stdout > config.yaml
 chmod 600 config.yaml            # then set gateway.token and your PDL
+sudo chown 1000:1000 config.yaml # only if `id -u` does not already say 1000
 docker compose up -d             # see docker-compose.yaml
+```
+
+That third line is not ceremony. The container runs as uid 1000 and the config
+is bind-mounted, and Docker does not translate ownership across a bind mount: a
+mode-600 file owned by any other uid is unreadable inside, and releve
+restart-loops on `Permission denied`. Widening the mode is the wrong fix — the
+file holds a gateway token. Give the file to the uid that has to read it, or
+keep the token out of it entirely and pass `RELEVE_GATEWAY__TOKEN` in the
+environment, which every key supports (see [Configuration](#configuration)).
+
+The image runs as uid 1000. If your account is not — `id -u` says — the
+mode-600 config is unreadable inside the container and releve restart-loops on
+`Permission denied`. The file holds a gateway token, so the fix is not a wider
+mode:
+
+```bash
+RELEVE_UID=$(id -u) RELEVE_GID=$(id -g) docker compose up -d
 ```
 
 Or with Python 3.12+:

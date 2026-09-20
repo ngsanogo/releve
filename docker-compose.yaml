@@ -2,7 +2,13 @@
 #
 #   docker run --rm ghcr.io/ngsanogo/releve:v0.3.1 init --stdout > config.yaml
 #   chmod 600 config.yaml     # then set gateway.token and your usage point
+#   sudo chown 1000:1000 config.yaml   # unless your own uid is already 1000
 #   docker compose up -d
+#
+# The chown is what makes the mount below readable: this container runs as uid
+# 1000, and a bind mount carries the host's ownership in unchanged. Without it
+# releve restart-loops on "Permission denied" — and the mode stays 600, because
+# the file holds a gateway token.
 #
 # The image is pinned: an upgrade is a decision (see "Backup, restore, upgrade" in README.md).
 services:
