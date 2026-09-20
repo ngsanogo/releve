@@ -59,7 +59,7 @@ jobs:
         with:
           persist-credentials: false
       - name: hassfest
-        uses: home-assistant/actions/hassfest@58bff37c8947f690ace498be413a9b78d6f30f93 # master, 2026-09
+        uses: home-assistant/actions/hassfest@4b258cf2bf1668d8e0adcb6b2be96b6cda36f42f # 1.0.0
       - name: HACS validation
         uses: hacs/action@d556e736723344f83838d08488c983a15381059a # 22.5.0
         with:
@@ -130,7 +130,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
-      - uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Build both architectures
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
