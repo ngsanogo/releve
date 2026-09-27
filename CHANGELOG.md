@@ -6,6 +6,24 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-09-27
+
+### Changed
+- Home Assistant devices and MQTT discovery no longer claim Enedis/Linky
+  branding: manufacturer is `releve`, model is `Electricity meter cache`, and
+  the default name is `Meter {pdl}`.
+- Quickstart: a mode-600 `config.yaml` must be owned by uid 1000 when the
+  account is not already that uid — otherwise the bind-mounted file is
+  unreadable in the container and releve restart-loops on `Permission denied`.
+  Passing `RELEVE_GATEWAY__TOKEN` instead of putting the token in the file is
+  the other way.
+- `NOTICE` lists copyright and third-party attributions; the Makefile is the
+  local entry point and mirrors CI.
+
+### Fixed
+- CI's hassfest pin: Dependabot had moved it to the unrelated tag `1.0.0`
+  (2020), which broke the Home Assistant job.
+
 ## [0.3.1] - 2026-09-19
 
 The first release published since 0.2.0. 0.3.0 was tagged but never published:
@@ -127,7 +145,8 @@ First release.
 - One-way import of databases in the earlier SQLAlchemy layout, with a backup.
 - Container image for amd64 and arm64.
 
-[Unreleased]: https://github.com/ngsanogo/releve/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/ngsanogo/releve/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/ngsanogo/releve/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/ngsanogo/releve/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/ngsanogo/releve/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ngsanogo/releve/compare/v0.1.0...v0.2.0

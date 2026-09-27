@@ -1,6 +1,6 @@
 # releve: example deployment.
 #
-#   docker run --rm ghcr.io/ngsanogo/releve:v0.3.1 init --stdout > config.yaml
+#   docker run --rm ghcr.io/ngsanogo/releve:v0.3.2 init --stdout > config.yaml
 #   chmod 600 config.yaml     # then set gateway.token and your usage point
 #   sudo chown 1000:1000 config.yaml   # unless your own uid is already 1000
 #   docker compose up -d
@@ -13,7 +13,7 @@
 # The image is pinned: an upgrade is a decision (see "Backup, restore, upgrade" in README.md).
 services:
   releve:
-    image: ghcr.io/ngsanogo/releve:v0.3.1
+    image: ghcr.io/ngsanogo/releve:v0.3.2
     restart: unless-stopped
     ports:
       - "127.0.0.1:8080:8080"
