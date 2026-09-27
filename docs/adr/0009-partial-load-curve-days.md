@@ -29,8 +29,11 @@ replace a day's points. A review found that it:
   Every new day brings a missing day, yesterday, whose window reaches every
   unsettled day. So a partial day is asked for again at least once a day, at no
   cost, until it is `SETTLE_DAYS` old. After that it is kept as it is.
-- **A partial day skips the gateway's cache.** A window holding a partial day is
-  asked for without the gateway's cache, whatever `gateway.prefer_cache` says.
+- **A partial day, and an unsettled missing day, skip the gateway's cache.** A
+  window holding either is asked for without the gateway's cache, whatever
+  `gateway.prefer_cache` says. Observed live: `/cache` can keep serving a
+  HTTP 429 for the same window for days; the live path still answers. A cached
+  429 is also retried once without `/cache` inside the gateway client.
 - **A day's curve only ever gets better.** `Store.upsert_curve` takes one usage
   point, direction and day at a time:
   - an answer that is not a complete grid is merged into a day that is not one

@@ -113,6 +113,24 @@ def test_a_load_curve_can_be_asked_past_the_cache(
     assert (mock.calls(f"{path}/cache"), mock.calls(path)) == (1, 1)
 
 
+def test_a_cached_throttle_is_retried_without_the_gateway_cache(
+    mock: HttpDouble, governor: QuotaGovernor, clock: FrozenClock
+) -> None:
+    """MyElectricalData can keep a 429 in /cache; the live path must still be tried."""
+    path = f"/consumption_load_curve/{PDL}/start/2026-09-08/end/2026-09-11"
+    body = {
+        "detail": '{"code":"900804","message":"Message throttled out",'
+        '"nextAccessTime":"2026-Sep-12 20:00:00+0000 UTC"}'
+    }
+    mock.on(f"{path}/cache", status=429, json=body)
+    mock.on(path, json=readings(("2026-09-08 00:30:00", 400)))
+    with gateway_client(mock, governor, clock, prefer_cache=True) as gateway:
+        assert len(gateway.load_curve(PDL, C, START, END)) == 1
+    assert (mock.calls(f"{path}/cache"), mock.calls(path)) == (1, 1)
+    assert governor.usage(PDL).blocked_until is None
+    assert governor.usage(PDL).used == 2
+
+
 def test_the_october_fall_back_keeps_both_repeated_hours(
     mock: HttpDouble, client: GatewayClient
 ) -> None:

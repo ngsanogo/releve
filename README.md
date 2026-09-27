@@ -61,7 +61,7 @@ history without extra hardware.
 With Docker (amd64 and arm64 images):
 
 ```bash
-docker run --rm ghcr.io/ngsanogo/releve:v0.3.2 init --stdout > config.yaml
+docker run --rm ghcr.io/ngsanogo/releve:v0.3.3 init --stdout > config.yaml
 chmod 600 config.yaml            # then set gateway.token and your PDL
 sudo chown 1000:1000 config.yaml # only if `id -u` does not already say 1000
 docker compose up -d             # see docker-compose.yaml
@@ -78,7 +78,7 @@ environment, which every key supports (see [Configuration](#configuration)).
 Or with Python 3.12+:
 
 ```bash
-uv tool install git+https://github.com/ngsanogo/releve@v0.3.2
+uv tool install git+https://github.com/ngsanogo/releve@v0.3.3
 releve init                      # writes ~/.config/releve/config.yaml
 $EDITOR ~/.config/releve/config.yaml   # set gateway.token and your PDL
 releve check                     # explains the configuration

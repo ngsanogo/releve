@@ -329,8 +329,10 @@ def sync_dataset(
 ) -> Fetched:
     """Fetch the `missing` days of `dataset` (see `backlog`).
 
-    Partial load-curve days ride along (see `partial_days`). A window holding one
-    skips the gateway's cache: its copy of that day may be the same partial answer.
+    Partial load-curve days ride along (see `partial_days`). A window holding a
+    partial day, or an unsettled missing day, skips the gateway's cache: its copy
+    may be a partial answer, and observed live it can also keep serving a cached
+    HTTP 429 forever.
 
     A window the gateway holds nothing for (404) or refuses (400) is skipped. When
     all the missing days it holds are settled (typically before the meter's
@@ -340,12 +342,16 @@ def sync_dataset(
     the other windows are done.
     """
     partial = partial_days(store, usage_point, dataset, history_days, today) if missing else set()
+    unsettled_from = today - timedelta(days=SETTLE_DAYS - 1)
     changed = 0
     awaiting_publication = False
     refused: WindowRejectedError | None = None
     for start, end in plan_windows(missing, dataset.window_days, refresh=partial):
         asked = [day for day in missing if start <= day < end]
-        use_cache = not any(start <= day < end for day in partial)
+        use_cache = not (
+            any(start <= day < end for day in partial)
+            or any(day >= unsettled_from for day in asked)
+        )
         settled = max(asked) <= today - timedelta(days=SETTLE_DAYS)
         try:
             delivered, window_changes = _fetch_window(
