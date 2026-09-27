@@ -57,6 +57,10 @@ class QuotaGovernor:
     def block(self, bucket: str, until: datetime, cause: str) -> None:
         self._store.block(bucket, until, cause)
 
+    def clear_block(self, bucket: str) -> None:
+        """Drop an upstream block so a follow-up call (e.g. past the cache) may run."""
+        self._store.clear_block(bucket)
+
     def usage(self, bucket: str) -> QuotaUsage:
         now = self._clock()
         return self._store.quota_usage(bucket, at=now, day_start=utc_midnight(now))

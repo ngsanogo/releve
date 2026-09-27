@@ -222,7 +222,8 @@ class GatewayClient:
         """The load curve of the Paris days [start, end).
 
         `use_cache=False` bypasses the gateway's cache even when `prefer_cache` is
-        set: its copy of a day Enedis published partially may be that partial day.
+        set: its copy of a day Enedis published partially may be that partial day,
+        and observed live it can keep serving a cached HTTP 429.
         """
         endpoint = f"{direction}_load_curve"
         path = f"/{endpoint}/{usage_point}/start/{start}/end/{end}"
@@ -282,7 +283,12 @@ class GatewayClient:
     # -- plumbing -----------------------------------------------------------------------
     def _get(self, bucket: str, endpoint: str, path: str, *, cacheable: bool) -> Any:
         if cacheable and self._settings.prefer_cache:
-            path = f"{path}/cache"
+            try:
+                return self._request("GET", bucket, endpoint, f"{path}/cache")
+            except ThrottledError:
+                # MyElectricalData can keep a 429 in /cache; the live path still works.
+                log.info("%s: gateway cache throttled; retrying without /cache", endpoint)
+                self._governor.clear_block(bucket)
         return self._request("GET", bucket, endpoint, path)
 
     def _request(self, method: str, bucket: str, endpoint: str, path: str) -> Any:

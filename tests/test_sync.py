@@ -96,6 +96,7 @@ def next_day(clock: FrozenClock, gateway: FakeGateway) -> date:
     clock.advance(timedelta(days=1))
     gateway.published_until += timedelta(days=1)
     gateway.calls.clear()
+    gateway.uncached_calls.clear()
     return gateway.published_until
 
 
@@ -156,13 +157,30 @@ def test_a_partial_curve_day_is_asked_past_the_gateway_cache(
     settings = curve_settings(database)
     gateway = gateway_for(governor, clock, partial_curves={recent}, stale_curve_cache=True)
     run_pass(settings, gateway, store, [], clock)
-    assert gateway.uncached_calls == []  # nothing was known to be partial yet
+    # Unsettled missing days already skip the cache; the partial rides along.
+    assert gateway.uncached_calls
 
     gateway.partial_curves.clear()
     next_day(clock, gateway)
     run_pass(settings, gateway, store, [], clock)
 
     assert len(store.curve(PDL, Direction.CONSUMPTION, recent, recent + timedelta(days=1))) == 48
+
+
+def test_an_unsettled_missing_curve_day_skips_the_gateway_cache(
+    database: Path, store: Store, governor: QuotaGovernor, clock: FrozenClock
+) -> None:
+    """Yesterday's first ask must not hit /cache: a cached 429 there sticks forever."""
+    settings = curve_settings(database)
+    gateway = gateway_for(governor, clock)
+    run_pass(settings, gateway, store, [], clock)
+    gateway.uncached_calls.clear()
+
+    today = next_day(clock, gateway)
+    yesterday = today - timedelta(days=1)
+    run_pass(settings, gateway, store, [], clock)
+
+    assert (PDL, "consumption_load_curve", yesterday, today) in gateway.uncached_calls
 
 
 def test_refetching_unchanged_curve_days_changes_nothing(

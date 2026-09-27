@@ -370,6 +370,10 @@ class Store:
                 (bucket, to_unix(until), cause),
             )
 
+    def clear_block(self, bucket: str) -> None:
+        with self._write() as conn:
+            conn.execute("DELETE FROM quota_block WHERE bucket = ?", (bucket,))
+
     def quota_usage(self, bucket: str, *, at: datetime, day_start: datetime) -> QuotaUsage:
         with self._connect() as conn:
             used = _calls_since(conn, bucket, day_start)
