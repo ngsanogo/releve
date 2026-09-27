@@ -2,14 +2,24 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
+*.egg
 dist/
 build/
+.eggs/
+.tox/
+.nox/
 .venv*/
 .mypy_cache/
 .ruff_cache/
 .pytest_cache/
+.hypothesis/
+.cache/
 .coverage
+.coverage.*
+coverage.xml
+*.cover
 htmlcov/
+*.log
 
 # Runtime data (never commit user data or secrets)
 *.db

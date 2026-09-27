@@ -1,5 +1,9 @@
 # Tests of custom_components/releve against a real Home Assistant core.
 # pytest-homeassistant-custom-component pins homeassistant (0.13.365 = 2026.9.2).
 # Kept apart from uv.lock: Home Assistant pins its own versions of shared libraries.
+#
+# Not redistributed with releve. Home Assistant Core pulls transitive packages
+# under GPL-3.0 and LGPL that must never be vendored into this repository or
+# into the releve wheel/image. .venv-ha/ stays local and gitignored.
 pytest-homeassistant-custom-component==0.13.365
 mypy==2.3.1

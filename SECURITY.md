@@ -21,7 +21,8 @@ a release together with the advisory.
   `wss://` and `https://` across untrusted networks.
 
 releve talks to the MyElectricalData gateway and to the exporters you enable,
-nothing else — no telemetry.
+nothing else — no telemetry. Keep gateway tokens and any enabled customer data
+(`identity` / `contact` / `address`) on systems you control.
 
 ## Supported versions
 

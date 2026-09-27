@@ -2,6 +2,9 @@
 
 Merci ! / Thanks! Issues and pull requests are welcome, in English or French.
 
+Coding-agent instructions (tool-agnostic) live in [`AGENTS.md`](AGENTS.md).
+Prefer that single file over any vendor-specific rules file.
+
 ## Getting started
 
 ```bash

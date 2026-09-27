@@ -114,4 +114,5 @@ fmt: ## Apply ruff's fixes and formatting
 	uv run ruff format $(SOURCES)
 
 clean: ## Remove the build output and the caches
-	rm -rf dist build .mypy_cache .ruff_cache .pytest_cache .coverage htmlcov
+	rm -rf dist build .mypy_cache .ruff_cache .pytest_cache .hypothesis \
+	  .coverage .coverage.* coverage.xml htmlcov

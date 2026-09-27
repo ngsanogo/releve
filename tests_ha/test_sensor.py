@@ -50,7 +50,11 @@ async def test_sensors_follow_what_releve_publishes(hass: HomeAssistant, releve_
 
     meter = dr.async_get(hass).async_get_device_by_identifier((DOMAIN, PDL), entry.entry_id)
     assert meter is not None
-    assert (meter.name, meter.manufacturer, meter.serial_number) == (f"Linky {PDL}", "Enedis", PDL)
+    assert (meter.name, meter.manufacturer, meter.serial_number) == (
+        f"Meter {PDL}",
+        "releve",
+        PDL,
+    )
     assert meter.configuration_url == f"{URL}/usage-points/{PDL}"
 
 

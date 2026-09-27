@@ -1,0 +1,35 @@
+# Index / search exclusions for agents and CLI tools that honour .ignore
+# (ripgrep, many code indexers). Complements .gitignore; does not replace it.
+
+# Local environments and tool caches
+.venv/
+.venv-ha/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.hypothesis/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# Build artefacts
+dist/
+build/
+
+# Runtime data and secrets
+*.db
+*.db-*
+*.sqlite3
+config.yaml
+.env
+*.log
+
+# Editor / OS noise
+.idea/
+.vscode/
+.DS_Store
