@@ -136,7 +136,7 @@ exporters:
     url: "ws://homeassistant.local:8123/api/websocket"
     token: t
     statistic_id: "myelectricaldata:{pdl}_consumption_full"
-    statistic_name: "Linky {pdl} consommation"
+    statistic_name: "Electricity consumption {pdl}"
     anchor_hour: 23
     allow_insecure: true
 observability: {sentry_dsn: ""}

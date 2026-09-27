@@ -1,0 +1,40 @@
+releve
+Copyright 2026 Issa Sanogo
+
+Licensed under the Apache License, Version 2.0.
+See the LICENSE file distributed with this work.
+
+This product redistributes third-party open-source components. Notable
+runtime dependencies and the license under which releve uses them:
+
+  httpx2                 BSD-3-Clause
+  jinja2                 BSD-3-Clause
+  paho-mqtt              BSD-3-Clause
+                         (dual-licensed EPL-2.0 OR BSD-3-Clause; BSD chosen)
+  pydantic               MIT
+  pydantic-settings      MIT
+  starlette              BSD-3-Clause
+  uvicorn                BSD-3-Clause
+  websockets             BSD-3-Clause
+
+Transitive runtime dependencies are MIT, BSD, or PSF. The frozen production
+set is listed in uv.lock; no GPL, AGPL, SSPL, proprietary, or
+non-commercial-only packages are used at runtime.
+
+The optional Home Assistant integration test environment
+(tests_ha/requirements.txt) pulls Home Assistant Core and its dependencies
+for local CI only. That environment is not part of the releve package or
+container image and must not be redistributed with releve.
+
+Trademarks and third-party services
+-----------------------------------
+releve is an independent project. It is not affiliated with, endorsed by, or
+sponsored by Enedis, RTE, MyElectricalData, the Home Assistant project, HACS,
+InfluxData, VictoriaMetrics, Grafana Labs, the Prometheus authors, Eclipse
+Foundation, Docker, Inc., or any other named third party.
+
+Names of third-party products and services appear only to describe
+interoperability (nominative use). Users must hold a valid consent/token and
+comply with the terms of MyElectricalData and of any upstream data or export
+destination they enable. Those terms can change or access can be revoked
+independently of this software.

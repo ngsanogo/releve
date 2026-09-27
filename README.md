@@ -261,6 +261,23 @@ The design is written down in [docs/architecture.md](docs/architecture.md) and
 the [ADRs](docs/adr). Contributions are welcome, in English or French — see
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## License
+## License and notices
 
-[Apache-2.0](LICENSE).
+[Apache-2.0](LICENSE). Copyright and third-party attributions are in
+[`NOTICE`](NOTICE).
+
+releve is an **independent** project. It is not affiliated with, endorsed by, or
+sponsored by Enedis, RTE, MyElectricalData, Home Assistant, HACS, InfluxData,
+VictoriaMetrics, Grafana Labs, or any other named third party. Product names
+appear only to describe interoperability.
+
+You need a valid MyElectricalData consent/token (and must follow that service's
+terms, and Enedis/RTE rules where they apply). Upstream access can change or be
+revoked without this software changing. Optional customer datasets
+(`identity`, `contact`, `address`) are off by default; when enabled, data stays
+in your local SQLite file and is never sent anywhere except the exporters you
+turn on — you remain the data controller.
+
+Runtime dependencies are OSI-permissive and free for commercial use (see
+`NOTICE`). The Home Assistant test harness under `tests_ha/` is not shipped with
+releve and may pull copyleft packages for CI only.

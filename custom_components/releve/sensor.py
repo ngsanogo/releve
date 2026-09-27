@@ -146,9 +146,9 @@ async def async_setup_entry(
     for pdl, meter in coordinator.data.meters.items():
         device = DeviceInfo(
             identifiers={(DOMAIN, pdl)},
-            name=meter.info.get("name") or f"Linky {pdl}",
-            manufacturer="Enedis",
-            model="Linky",
+            name=meter.info.get("name") or f"Meter {pdl}",
+            manufacturer="releve",
+            model="Electricity meter cache",
             serial_number=pdl,
             configuration_url=f"{url}/usage-points/{pdl}",
         )

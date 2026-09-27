@@ -133,7 +133,8 @@ class MqttExporter:
                 device = {
                     "identifiers": [f"releve_{up.id}"],
                     "name": f"Electricity meter {up.id}",
-                    "model": "Electricity meter",
+                    "manufacturer": "releve",
+                    "model": "Electricity meter cache",
                 }
                 wanted = (
                     (CONSUMPTION_SENSORS, up.consumption),
@@ -151,7 +152,8 @@ class MqttExporter:
                 device = {
                     "identifiers": ["releve_rte"],
                     "name": "Grid signals",
-                    "model": "Tempo and Ecowatt",
+                    "model": "Grid signals",
+                    "manufacturer": "releve",
                 }
                 messages.extend(
                     self._discovery("releve_rte", RTE_SENSORS, True, state_topic, device)

@@ -17,14 +17,14 @@ WORKDIR /src
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project
-COPY README.md LICENSE ./
+COPY README.md LICENSE NOTICE ./
 COPY src ./src
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-editable
 
 FROM ${PYTHON_IMAGE}
 LABEL org.opencontainers.image.title="releve" \
-      org.opencontainers.image.description="Quota-aware local cache of Enedis Linky data, exported to Home Assistant, MQTT and InfluxDB" \
+      org.opencontainers.image.description="Quota-aware local cache of French electricity meter readings, with MQTT and time-series exports" \
       org.opencontainers.image.source="https://github.com/ngsanogo/releve" \
       org.opencontainers.image.licenses="Apache-2.0"
 
@@ -33,7 +33,8 @@ RUN useradd --create-home --uid 1000 app \
 
 # The venv's scripts embed /app/.venv: same path as in the build stage.
 COPY --from=build /app/.venv /app/.venv
-# TZ: releve states every instant in Paris time (Enedis counts Paris days); so does its log.
+COPY LICENSE NOTICE /licenses/
+# TZ: releve states every instant in Paris civil time; so does its log.
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
