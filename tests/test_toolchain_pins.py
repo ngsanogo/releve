@@ -27,7 +27,7 @@ def test_the_image_runs_the_python_the_tests_run_on() -> None:
 
 
 def test_uv_is_one_version_everywhere() -> None:
-    """mise installs it on a workstation, setup-uv in CI, the Dockerfile in the image."""
+    """mise installs it for development, setup-uv in CI, the Dockerfile in the image."""
     uv = tomllib.loads(read("mise.toml"))["tools"]["uv"]
     pyproject = tomllib.loads(read("pyproject.toml"))
     assert pyproject["build-system"]["requires"] == [f"uv_build=={uv}"]

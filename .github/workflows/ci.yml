@@ -183,7 +183,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       # gitleaks at the version mise.toml names, verified against the checksum
-      # mise.lock holds: the binary `make secrets` runs on a workstation.
+      # mise.lock holds: the same binary `make secrets` runs.
       - uses: jdx/mise-action@94c60b39bc2d90ab2f9bab27f38d3cc4812c1834 # v5.1.0
         with:
           install_args: gitleaks

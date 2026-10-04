@@ -1,4 +1,4 @@
-# The toolchain of this repository: the two binaries `make` needs on the machine.
+# The toolchain of this repository: the two binaries `make` needs beside Docker.
 #
 #   mise install     # after a clone, and after this file changes
 #
