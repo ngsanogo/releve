@@ -63,11 +63,6 @@ dev = [
   "types-PyYAML==6.0.12.20260906",
 ]
 
-# One uv everywhere: the Dockerfile's image carries the same number, and CI's
-# setup-uv installs the version it reads here.
-[tool.uv]
-required-version = "==0.12.22"
-
 [tool.ruff]
 line-length = 100
 target-version = "py314"
