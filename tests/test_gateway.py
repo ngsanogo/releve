@@ -78,15 +78,15 @@ def test_daily_energy_is_parsed_and_the_call_is_counted(
 ) -> None:
     mock.on(
         DAILY_PATH,
-        json=readings(("2026-09-08", "5715"), ("2026-09-09", 6517), ("2026-09-10", "6028.0")),
+        json=readings(("2026-09-08", "5250"), ("2026-09-09", 6750), ("2026-09-10", "6125.0")),
     )
 
     energy = client.daily(PDL, C, START, END)
 
     assert [(e.day, e.wh) for e in energy] == [
-        (date(2026, 9, 8), 5715),
-        (date(2026, 9, 9), 6517),
-        (date(2026, 9, 10), 6028),
+        (date(2026, 9, 8), 5250),
+        (date(2026, 9, 9), 6750),
+        (date(2026, 9, 10), 6125),
     ]
     assert mock.requests[-1].headers["Authorization"] == "secret"
     assert governor.usage(PDL).used == 1
@@ -330,12 +330,12 @@ def test_consent_contract_identity_contact_address_and_tempo_extras(
         json={
             "valid": True,
             "information": "",
-            "consent_expiration_date": "2029-09-12T22:04:31",
+            "consent_expiration_date": "2029-09-12T00:00:00",
             "call_number": 6,
             "quota_reached": False,
             "quota_limit": 50,
             "quota_reset_at": "2026-09-13T23:59:59.999999",
-            "last_call": "2026-06-21T11:57:27.051689",
+            "last_call": "2026-09-11T12:00:00.000000",
             "ban": False,
         },
     )
@@ -349,16 +349,16 @@ def test_consent_contract_identity_contact_address_and_tempo_extras(
                         "usage_point": {
                             "usage_point_id": PDL,
                             "usage_point_status": "COM",
-                            "meter_type": "TCB",
+                            "meter_type": "AMM",
                         },
                         "contracts": {
                             "segment": "C5",
                             "subscribed_power": "9 kVA",
-                            "last_activation_date": "2019-07-16+02:00",
-                            "distribution_tariff": "BTINFCU4",
-                            "offpeak_hours": "HC (0H50-6H50;14H20-16H20)",
+                            "last_activation_date": "2020-07-01+02:00",
+                            "distribution_tariff": "BTINFCUST",
+                            "offpeak_hours": "HC (1H30-7H30;12H30-14H30)",
                             "contract_status": "SERVC",
-                            "last_distribution_tariff_change_date": "2024-03-17+01:00",
+                            "last_distribution_tariff_change_date": "2022-01-15+01:00",
                         },
                     }
                 ],
@@ -386,7 +386,7 @@ def test_consent_contract_identity_contact_address_and_tempo_extras(
                         "usage_point": {
                             "usage_point_id": PDL,
                             "usage_point_status": "COM",
-                            "meter_type": "TCB",
+                            "meter_type": "AMM",
                             "usage_point_addresses": {
                                 "street": "1 rue",
                                 "locality": None,
@@ -420,7 +420,7 @@ def test_consent_contract_identity_contact_address_and_tempo_extras(
     assert consent.call_number == 6
     contract = client.contract(PDL)
     assert contract.offpeak_hours is not None
-    assert "0H50" in contract.offpeak_hours
+    assert "1H30" in contract.offpeak_hours
     assert client.identity(PDL).firstname == "Ada"
     assert client.contact(PDL).email == "a@b.c"
     assert client.addresses(PDL).city == "Paris"

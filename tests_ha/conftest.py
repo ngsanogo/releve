@@ -21,7 +21,7 @@ USAGE_POINTS: list[dict[str, Any]] = [
     }
 ]
 STATE: dict[str, Any] = {
-    "energy_yesterday_kwh": 6.028,
+    "energy_yesterday_kwh": 6.125,
     "energy_last_7_days_kwh": None,
     "energy_last_30_days_kwh": None,
     "latest_day": "2026-09-11",

@@ -125,10 +125,10 @@ class FakeGateway:
             usage_point,
             segment="C5",
             subscribed_power="9 kVA",
-            distribution_tariff="BTINFCU4",
+            distribution_tariff="BTINFCUST",
             offpeak_hours="HC (22H00-6H00)",
             contract_status="SERVC",
-            meter_type="TCB",
+            meter_type="AMM",
             usage_point_status="COM",
         )
 

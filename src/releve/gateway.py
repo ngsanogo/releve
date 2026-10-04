@@ -659,7 +659,7 @@ def _interval_readings(payload: Any, path: str) -> list[tuple[str, int]]:
 
 
 def _whole_number(raw: object, path: str) -> int:
-    """Enedis sends integers, usually as text ("5715"); anything else is refused."""
+    """Enedis sends integers, usually as text ("5250"); anything else is refused."""
     if isinstance(raw, bool) or not isinstance(raw, str | int | float):
         raise GatewayError(f"unexpected payload on {path}: bad value {raw!r}")
     try:

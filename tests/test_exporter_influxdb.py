@@ -30,12 +30,12 @@ def test_line_protocol_series_and_escaping() -> None:
     end = day_start(DAY) + timedelta(minutes=30)
     lines = line_protocol(
         "my energy,v2",
-        [DailyEnergy(PDL, C, DAY, 5715)],
+        [DailyEnergy(PDL, C, DAY, 5250)],
         [LoadCurvePoint(PDL, Direction.PRODUCTION, end, 752)],
         [PowerPeak(PDL, DAY, 6100, at_paris_hour(DAY, 19))],
     )
     assert lines == [
-        f"my\\ energy\\,v2,usage_point={PDL},direction=consumption,kind=daily wh=5715i 1788991200",
+        f"my\\ energy\\,v2,usage_point={PDL},direction=consumption,kind=daily wh=5250i 1788991200",
         (
             f"my\\ energy\\,v2,usage_point={PDL},direction=production,kind=load_curve"
             " watts=752i 1788993000"

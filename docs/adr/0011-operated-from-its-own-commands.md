@@ -4,13 +4,13 @@ Date: 2026-09-19 · Status: accepted
 
 ## Context
 
-A week of running releve next to Home Assistant on a Raspberry Pi showed what
-the deployment had to make up for:
+A week of operation next to Home Assistant showed what a deployment had to
+make up for:
 
-- **No way to copy the database.** The deployment ran its own Python script
-  inside the container to call SQLite's backup API: it had to know the image
-  ships an interpreter, where the database is, and that a file copy of a WAL
-  database proves nothing.
+- **No way to copy the database.** A deployment had to run its own Python
+  script inside the container to call SQLite's backup API: it had to know the
+  image ships an interpreter, where the database is, and that a file copy of
+  a WAL database proves nothing.
 - **A journal that cried wolf.** Every night the first pass after midnight
   asked for a day Enedis had not published yet; the gateway answered 404 and
   releve journaled a failure — six nights out of six, each gone by the morning.

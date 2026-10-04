@@ -73,7 +73,7 @@ INSERT INTO quota_block VALUES
 INSERT INTO sync_run VALUES
     (1, '09876543210987', '2026-09-12 08:00:00.000000', '2026-09-12 08:01:00.000000', 1, 'x');
 INSERT INTO ha_export_boundary VALUES
-    ('myelectricaldata:09876543210987_consumption_full', '2026-08-28', 8481.922000000004);
+    ('myelectricaldata:09876543210987_consumption_full', '2026-08-28', 1234.567000000004);
 """
 
 
@@ -102,7 +102,7 @@ def test_a_legacy_database_is_migrated_in_place_with_a_backup(
     assert not {"schema_info", "daily_reading", "sync_run"} & tables
     assert not any(name.startswith("legacy_") for name in tables)
 
-    assert store.ha_boundary(ARCHIVE) == HaBoundary(ARCHIVE, date(2026, 8, 28), 8481.922000000004)
+    assert store.ha_boundary(ARCHIVE) == HaBoundary(ARCHIVE, date(2026, 8, 28), 1234.567000000004)
     assert [
         (r.day, r.wh) for r in store.daily(LEGACY_PDL, Direction.CONSUMPTION, date.min, date.max)
     ] == [(date(2026, 8, 28), 9100)]

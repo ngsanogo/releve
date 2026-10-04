@@ -22,7 +22,7 @@ def test_offpeak_hours_parse_overnight_and_split_ranges() -> None:
         datetime(2026, 9, 12, 12, 0, tzinfo=PARIS).time().replace(tzinfo=None)
     )
 
-    split = OffpeakHours.parse("HC (0H50-6H50;14H20-16H20)")
+    split = OffpeakHours.parse("HC (1H30-7H30;12H30-14H30)")
     assert split is not None
     assert len(split.ranges) == 2
 

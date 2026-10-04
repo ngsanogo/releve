@@ -16,7 +16,7 @@ a release together with the advisory.
   `0700` directory.
 - **The web interface** is read-only and listens on `127.0.0.1` by default. To
   reach it from elsewhere, set `web.auth_token` and put it behind a reverse proxy
-  with TLS, a VPN or a tailnet.
+  with TLS, or a VPN.
 - **Exporters** only talk to the destinations you enable; use `mqtt.tls`,
   `wss://` and `https://` across untrusted networks.
 

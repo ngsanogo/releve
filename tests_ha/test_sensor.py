@@ -37,7 +37,7 @@ async def test_sensors_follow_what_releve_publishes(hass: HomeAssistant, releve_
     entry = await set_up(hass)
     assert entry.state is ConfigEntryState.LOADED
 
-    assert state_of(hass, f"{PDL}_energy_yesterday_kwh") == "6.028"
+    assert state_of(hass, f"{PDL}_energy_yesterday_kwh") == "6.125"
     assert state_of(hass, f"{PDL}_energy_last_7_days_kwh") == STATE_UNKNOWN  # null, not zero
     assert state_of(hass, f"{PDL}_max_power_yesterday_va") == "6100"
     assert state_of(hass, f"{PDL}_latest_day") == "2026-09-11"
@@ -63,7 +63,7 @@ async def test_no_grid_device_when_releve_has_grid_signals_off(
 ) -> None:
     releve_api(grid=None)
     entry = await set_up(hass)
-    assert state_of(hass, f"{PDL}_energy_yesterday_kwh") == "6.028"
+    assert state_of(hass, f"{PDL}_energy_yesterday_kwh") == "6.125"
     assert state_of(hass, f"{entry.entry_id}_grid_tempo_today") is None
 
 
@@ -77,7 +77,7 @@ async def test_an_unreachable_releve_is_retried_then_goes_unavailable(
     releve_api()
     await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
-    assert state_of(hass, f"{PDL}_energy_yesterday_kwh") == "6.028"
+    assert state_of(hass, f"{PDL}_energy_yesterday_kwh") == "6.125"
 
     releve_api(exc=aiohttp.ClientError())
     await entry.runtime_data.async_refresh()
@@ -110,5 +110,5 @@ async def test_diagnostics_leave_out_the_token_and_the_pdl(
     diagnostics = await async_get_config_entry_diagnostics(hass, entry)
     assert diagnostics["entry"]["token"] == "**REDACTED**"
     assert diagnostics["releve_version"] == "0.2.0"
-    assert diagnostics["meters"][0]["state"]["energy_yesterday_kwh"] == 6.028
+    assert diagnostics["meters"][0]["state"]["energy_yesterday_kwh"] == 6.125
     assert PDL not in repr(diagnostics)

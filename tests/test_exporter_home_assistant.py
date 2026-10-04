@@ -39,7 +39,7 @@ def test_a_day_without_a_complete_curve_lands_at_23_00() -> None:
 
 
 def test_rows_continue_the_boundary_and_keep_the_curve_total_on_curve_days() -> None:
-    boundary = HaBoundary(SERIES, DAY - timedelta(days=1), 8481.922000000004)
+    boundary = HaBoundary(SERIES, DAY - timedelta(days=1), 1234.567000000004)
     before = DailyEnergy(PDL, C, DAY - timedelta(days=1), 99_999)  # at the boundary: not ours
     daily = [
         before,
@@ -53,7 +53,7 @@ def test_rows_continue_the_boundary_and_keep_the_curve_total_on_curve_days() -> 
 
     assert len(rows) == 48
     assert rows[0].start == day_start(DAY)
-    assert rows[23].sum_kwh == pytest.approx(8481.922000000004 + curve_total / 1000)
+    assert rows[23].sum_kwh == pytest.approx(1234.567000000004 + curve_total / 1000)
     assert rows[46].sum_kwh == rows[23].sum_kwh  # flat until 23:00 on the daily-only day
     assert rows[47].start == at_paris_hour(DAY + timedelta(days=1), 23)
     assert rows[47].sum_kwh == pytest.approx(rows[23].sum_kwh + 7.0)
@@ -181,16 +181,16 @@ def test_an_existing_series_is_continued_after_its_last_hour(
     last_hour = at_paris_hour(DAY, 23)
     home_assistant.existing[SERIES] = [
         {"start": ms(last_hour - timedelta(days=40)), "sum": 1.0},
-        {"start": ms(last_hour), "sum": 8481.922},
+        {"start": ms(last_hour), "sum": 1234.567},
     ]
     run = cache_days(store, DAY - timedelta(days=1), DAY, DAY + timedelta(days=1))
 
     exporter_for(home_assistant).export(store, after_run=0, up_to_run=run)
 
-    assert store.ha_boundary(SERIES) == HaBoundary(SERIES, DAY, 8481.922, PDL)
+    assert store.ha_boundary(SERIES) == HaBoundary(SERIES, DAY, 1234.567, PDL)
     (imported,) = home_assistant.imports()
     assert imported["stats"][0]["start"] == day_start(DAY + timedelta(days=1)).isoformat()
-    assert imported["stats"][-1]["sum"] == 8486.922
+    assert imported["stats"][-1]["sum"] == 1239.567
     periods = [m["period"] for m in home_assistant.received if "period" in m]
     assert periods == ["month", "hour"]
 

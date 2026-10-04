@@ -25,7 +25,7 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - A load-curve window for an unsettled missing day (within `SETTLE_DAYS`) no
-  longer goes through the gateway's `/cache`. Observed live on a Pi: the cache
+  longer goes through the gateway's `/cache`. Observed live: the cache
   kept serving HTTP 429 for the same window for eight days, so the curve never
   advanced while daily totals still reached Home Assistant.
 - When `/cache` itself answers 429, the live path is tried once in the same

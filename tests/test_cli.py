@@ -128,13 +128,13 @@ def test_ha_boundary_show_and_set(tmp_path: Path, capsys: pytest.CaptureFixture[
     assert main(["ha-boundary", "-c", path]) == EXIT_OK
     assert "no boundary pinned yet" in capsys.readouterr().out
     assert (
-        main(["ha-boundary", "-c", path, "--set", "archive:series", "2026-08-28", "8481.922"])
+        main(["ha-boundary", "-c", path, "--set", "archive:series", "2026-08-28", "1234.567"])
         == EXIT_OK
     )
     assert main(["ha-boundary", "-c", path, "--set", "archive:fresh", "none", "0"]) == EXIT_OK
     assert main(["ha-boundary", "-c", path]) == EXIT_OK
     out = capsys.readouterr().out
-    assert "archive:series: owned after 2026-08-28, from 8481.922 kWh, for the next" in out
+    assert "archive:series: owned after 2026-08-28, from 1234.567 kWh, for the next" in out
     assert "archive:fresh: owned after its start, from 0.000 kWh" in out
     assert (
         main(["ha-boundary", "-c", path, "--set", "archive:series", "yesterday", "1"])
@@ -175,7 +175,7 @@ def test_backup_copies_the_database_without_touching_it(
     assert not (tmp_path / "cache.db").exists()  # and a backup never creates one
 
     Store.open(tmp_path / "cache.db").set_ha_boundary(
-        HaBoundary("archive:series", TODAY, 8481.922), restart_sinks=None
+        HaBoundary("archive:series", TODAY, 1234.567), restart_sinks=None
     )
     copy = tmp_path / "copy.db"
     assert main(["backup", "-c", path, str(copy)]) == EXIT_OK

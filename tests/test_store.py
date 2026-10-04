@@ -56,7 +56,7 @@ def test_a_new_database_is_private_and_at_the_latest_schema(database: Path) -> N
 def test_a_backup_is_a_checked_private_self_contained_copy(
     database: Path, store: Store, tmp_path: Path
 ) -> None:
-    store.set_ha_boundary(HaBoundary("archive:series", DAY, 8481.922), restart_sinks=None)
+    store.set_ha_boundary(HaBoundary("archive:series", DAY, 1234.567), restart_sinks=None)
     target = tmp_path / "backup.db"
 
     store.backup(target)
@@ -346,7 +346,7 @@ def test_export_cursors_and_boundaries(store: Store, clock: FrozenClock) -> None
     assert store.export_cursor("sink") == 7
     assert [cursor.run_id for cursor in store.export_cursors()] == [7]
 
-    boundary = HaBoundary("source:series", date(2026, 8, 28), 8481.922000000004)
+    boundary = HaBoundary("source:series", date(2026, 8, 28), 1234.567000000004)
     store.set_ha_boundary(boundary, restart_sinks=None)
     store.set_ha_boundary(HaBoundary("source:fresh", None, 0.0, PDL), restart_sinks=None)
     assert store.ha_boundary("source:series") == boundary

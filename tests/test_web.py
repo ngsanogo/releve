@@ -33,7 +33,7 @@ YESTERDAY = TODAY - timedelta(days=1)
 @pytest.fixture
 def client(database: Path, store: Store, governor: QuotaGovernor, clock: FrozenClock) -> TestClient:
     run = store.start_run(NOW)
-    store.upsert_daily(run, [DailyEnergy(PDL, Direction.CONSUMPTION, YESTERDAY, 6028)])
+    store.upsert_daily(run, [DailyEnergy(PDL, Direction.CONSUMPTION, YESTERDAY, 6125)])
     store.upsert_peaks(run, [PowerPeak(PDL, YESTERDAY, 6100, at_paris_hour(YESTERDAY, 19))])
     store.upsert_tempo([TempoDay(TODAY, "WHITE")])
     store.upsert_ecowatt([EcowattDay(TODAY, 2, "tendu")])
@@ -67,7 +67,7 @@ def test_the_dashboard_tells_the_truth(client: TestClient) -> None:
 def test_the_usage_point_page_and_unknown_usage_points(client: TestClient) -> None:
     page = client.get(f"/usage-points/{PDL}")
     assert page.status_code == 200
-    assert "6.028" in page.text
+    assert "6.125" in page.text
     assert "6100" in page.text
     assert client.get("/usage-points/99999999999999").status_code == 404
 
@@ -76,7 +76,7 @@ def test_the_json_api(client: TestClient) -> None:
     daily = client.get(
         f"/api/v1/usage-points/{PDL}/daily", params={"start": "2026-09-01", "end": "2026-09-12"}
     )
-    assert daily.json() == [{"day": "2026-09-11", "wh": 6028, "direction": "consumption"}]
+    assert daily.json() == [{"day": "2026-09-11", "wh": 6125, "direction": "consumption"}]
     production = client.get(
         f"/api/v1/usage-points/{PDL}/daily",
         params={"start": "2026-09-01", "end": "2026-09-12", "direction": "production"},
@@ -102,7 +102,7 @@ def test_the_state_api_serves_what_mqtt_publishes(client: TestClient) -> None:
         }
     ]
     assert client.get(f"/api/v1/usage-points/{PDL}/state").json() == {
-        "energy_yesterday_kwh": 6.028,
+        "energy_yesterday_kwh": 6.125,
         "energy_last_7_days_kwh": None,  # six days are missing: unknown, not a small week
         "energy_last_30_days_kwh": None,
         "latest_day": "2026-09-11",

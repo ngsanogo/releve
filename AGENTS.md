@@ -81,8 +81,8 @@ Domain types and contracts live in `domain.py`, `config.py` (Pydantic) and
 6. **Behaviour change ⇒ failing test first**, then the fix.
 7. **Conventional Commits**; user-visible changes go in `CHANGELOG.md` under
    `[Unreleased]`.
-8. In this codebase, **cursor / `export_cursor` means an exporter resume
-   position**, not an editor product.
+8. **`cursor` / `export_cursor` means an exporter's resume position** in the
+   cache's change feed.
 
 ## Do not commit
 
