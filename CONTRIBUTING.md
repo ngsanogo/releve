@@ -8,9 +8,14 @@ Prefer that single file over any vendor-specific rules file.
 ## Getting started
 
 ```bash
+mise install    # uv and gitleaks, at the versions mise.toml names
 make setup      # dependencies, the Home Assistant environment, the pre-commit hooks
 make check      # everything CI checks, in CI's order
 ```
+
+uv is required at one exact version (`[tool.uv] required-version` in
+`pyproject.toml`) and installs the one Python `.python-version` names; without
+[mise](https://mise.jdx.dev), install that uv version by hand.
 
 `make help` lists the rest. Every target mirrors one job of
 `.github/workflows/ci.yml`, so green here and green there mean the same thing —

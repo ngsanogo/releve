@@ -63,7 +63,7 @@ class InfluxExporter:
             return "no change"
         with httpx2.Client(timeout=TIMEOUT_SECONDS, transport=self._transport) as http:
             refusal = self._delete(http, dropped)
-            for batch in batched(lines, LINES_PER_REQUEST):
+            for batch in batched(lines, LINES_PER_REQUEST, strict=False):  # the last is shorter
                 self._write(http, batch)
         summary = f"{len(lines)} points written"
         if refusal is not None:

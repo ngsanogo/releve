@@ -170,7 +170,7 @@ class HomeAssistantExporter:
             metadata |= {"mean_type": 0, "unit_class": "energy"}
         else:
             metadata["has_mean"] = False
-        for chunk in batched(rows, ROWS_PER_IMPORT):
+        for chunk in batched(rows, ROWS_PER_IMPORT, strict=False):  # the last one is shorter
             session.request(
                 {
                     "type": "recorder/import_statistics",

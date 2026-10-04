@@ -273,7 +273,7 @@ def sync_customer(
                     store.upsert_address(gateway.addresses(pdl), at=now)
                 case _:
                     assert_never(resource)
-        except (RetryLaterError, AuthError, GatewayUnreachableError):
+        except RetryLaterError, AuthError, GatewayUnreachableError:
             raise
         except GatewayError as exc:
             store.record_customer_failure(pdl, resource, at=now, detail=str(exc))
