@@ -5,5 +5,5 @@
 # Not redistributed with releve. Home Assistant Core pulls transitive packages
 # under GPL-3.0 and LGPL that must never be vendored into this repository or
 # into the releve wheel/image. .venv-ha/ stays local and gitignored.
-pytest-homeassistant-custom-component==0.13.367
+pytest-homeassistant-custom-component==0.13.368
 mypy==2.4.0
