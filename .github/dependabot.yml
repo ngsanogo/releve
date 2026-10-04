@@ -1,27 +1,50 @@
 version: 2
+
+# One schedule for every ecosystem: Monday 05:00, Europe/Paris. Minor and patch
+# updates arrive grouped; a major arrives alone, as the decision it is.
+#
+# Versions are exact here (pyproject.toml, tests_ha/requirements.txt, Dockerfile),
+# and some are written in more than one file. tests/test_toolchain_pins.py and
+# uv's own `required-version` turn a half-moved pin red: the pull request then
+# needs the other file moved by hand (mise.toml and .python-version are not
+# watched by Dependabot).
 updates:
   - package-ecosystem: "uv"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
+      time: "05:00"
+      timezone: "Europe/Paris"
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
 
   # The Home Assistant the integration is tested against (tests_ha/requirements.txt):
-  # pytest-homeassistant-custom-component pins homeassistant, one release each.
+  # pytest-homeassistant-custom-component pins homeassistant, one release each —
+  # betas included, under an ordinary version number. Check which Home Assistant
+  # a bump brings before merging it.
   - package-ecosystem: "pip"
     directory: "/tests_ha"
     schedule:
       interval: "weekly"
+      day: "monday"
+      time: "05:00"
+      timezone: "Europe/Paris"
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "monthly"
+      interval: "weekly"
+      day: "monday"
+      time: "05:00"
+      timezone: "Europe/Paris"
     groups:
-      actions:
-        patterns: ["*"]
+      minor-and-patch:
+        update-types: ["minor", "patch"]
     ignore:
       # Only published tag is 1.0.0 (2020) and it breaks hassfest. Stay on a
       # pinned master SHA; bump that commit manually when needed.
@@ -30,8 +53,28 @@ updates:
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
-      interval: "monthly"
+      interval: "weekly"
+      day: "monday"
+      time: "05:00"
+      timezone: "Europe/Paris"
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
     ignore:
-      # The image's interpreter moves WITH the tested CI matrix, never ahead of it.
+      # The image's interpreter moves WITH .python-version, never ahead of it:
+      # a new minor is a decision taken there first.
       - dependency-name: "python"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
+
+  # docker-compose.yaml is the example deployment: its one image is releve's own,
+  # set to the release it ships with by the release procedure (a test holds it).
+  - package-ecosystem: "docker-compose"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "05:00"
+      timezone: "Europe/Paris"
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]

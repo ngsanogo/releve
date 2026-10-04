@@ -1,0 +1,23 @@
+# The toolchain of this repository: the two binaries `make` needs on the machine.
+#
+#   mise install     # after a clone, and after this file changes
+#
+# uv is exact because pyproject.toml requires it exactly (`[tool.uv]
+# required-version`): a machine-wide "latest" uv would refuse to run here the
+# day it moves. gitleaks is what `make secrets` and CI's secret scan run; CI
+# installs it from this file (`jdx/mise-action`), so both scan with one binary.
+#
+# `mise.lock`, beside this file and tracked, holds the checksum of each artefact
+# for linux-arm64 and linux-x64 (the runner). After changing a version:
+#   mise install && mise lock
+#
+# Python is not here: uv installs the one .python-version names.
+# tests/test_toolchain_pins.py holds every other mention of these versions
+# (Dockerfile, pyproject.toml, .pre-commit-config.yaml) to this file.
+
+[tools]
+gitleaks = "8.30.1"
+uv = "0.12.22"
+
+[settings]
+lockfile = true

@@ -5,24 +5,25 @@
 # file exists: the commands used to live as prose in CONTRIBUTING.md, where a
 # flag drifts from the workflow without anything noticing.
 #
-# One tool: uv. It owns the Python versions, the lockfile and every dev
-# dependency; nothing here needs a Python on the machine.
+# One tool: uv. It owns the Python version (.python-version), the lockfile and
+# every dev dependency; nothing here needs a Python on the machine. uv itself,
+# and the gitleaks of `make secrets`, come from mise.toml (`mise install`).
 
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 # The integration is tested against a REAL Home Assistant core, which pins its
 # own versions of libraries this project also locks. Hence a second environment,
-# built from tests_ha/requirements.txt and never from uv.lock, on the Python
-# version CI uses for that job.
+# built from tests_ha/requirements.txt and never from uv.lock, on the one Python
+# this repository names: .python-version, which uv reads by itself.
 HA_VENV    := .venv-ha
-HA_PYTHON  := 3.14
 
 # The MQTT exporter's integration test needs a broker, and skips itself without
 # one — a skip that looks like a pass. CI starts mosquitto for it; so does
 # `make test`, on the loopback and on a port nothing else on this machine holds.
 MQTT_PORT      := 1883
 MQTT_CONTAINER := releve-test-mqtt
+MQTT_IMAGE     := eclipse-mosquitto:2.1.2-alpine@sha256:38c0da4f2ef84284d47b3b3eeea1cb3bdeabe81ee10caf0cd5c5ff61ee3ea408
 
 # Paths ruff is pointed at. tests_ha and custom_components are first-party too
 # (pyproject's `tool.ruff.src`), so leaving them out would lint less than CI.
@@ -36,9 +37,9 @@ help: ## Show this help
 
 setup: ## Once after a clone: dependencies, the Home Assistant environment, the hooks
 	uv sync --frozen
-	uv venv --python $(HA_PYTHON) --allow-existing $(HA_VENV)
+	uv venv --allow-existing $(HA_VENV)
 	uv pip install --quiet --python $(HA_VENV) -r tests_ha/requirements.txt
-	uvx pre-commit install
+	uv run pre-commit install
 	@echo "✔ ready — 'make check' is what CI runs."
 
 check: lint typecheck test test-ha audit ## Everything CI checks, in CI's order
@@ -59,7 +60,7 @@ test: ## pytest with coverage (90% floor), against a throwaway MQTT broker
 	@docker rm --force $(MQTT_CONTAINER) >/dev/null 2>&1 || true
 	@docker run --detach --rm --name $(MQTT_CONTAINER) \
 	  --publish 127.0.0.1:$(MQTT_PORT):1883 \
-	  eclipse-mosquitto:2 mosquitto -c /mosquitto-no-auth.conf >/dev/null
+	  $(MQTT_IMAGE) mosquitto -c /mosquitto-no-auth.conf >/dev/null
 	@trap 'docker rm --force $(MQTT_CONTAINER) >/dev/null 2>&1 || true' EXIT; \
 	  MQTT_TEST_BROKER=127.0.0.1:$(MQTT_PORT) \
 	  uv run pytest --cov --cov-report=term-missing --cov-fail-under=90
@@ -69,7 +70,7 @@ test: ## pytest with coverage (90% floor), against a throwaway MQTT broker
 # they are NOT run here, and that is the whole difference between this target
 # and that job.
 test-ha: ## The integration against the pinned Home Assistant core: types, then tests
-	@uv venv --quiet --python $(HA_PYTHON) --allow-existing $(HA_VENV)
+	@uv venv --quiet --allow-existing $(HA_VENV)
 	@uv pip install --quiet --python $(HA_VENV) -r tests_ha/requirements.txt
 	$(CURDIR)/$(HA_VENV)/bin/python -m mypy --config-file tests_ha/mypy.ini custom_components/releve
 	cd tests_ha && $(CURDIR)/$(HA_VENV)/bin/python -m pytest -q

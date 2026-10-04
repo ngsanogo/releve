@@ -6,6 +6,21 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **Python 3.14 only.** releve is built, tested and shipped on one Python,
+  3.14.8 (`.python-version`); 3.12 and 3.13 are no longer supported. Nothing
+  changes for the Docker image, which already ran 3.14. An installation made
+  with `uv tool install` moves to Python 3.14 at its next upgrade — uv fetches
+  it by itself. The Home Assistant integration is unaffected: it runs on Home
+  Assistant's own Python.
+- The image is built from `python:3.14.8-slim-trixie` with uv 0.12.22, both
+  pinned by digest, and every dependency is pinned to an exact version
+  (`==` in `pyproject.toml`).
+- The Home Assistant integration is tested against Home Assistant 2026.9.4.
+- Development: `mise.toml` names the toolchain (uv 0.12.22, gitleaks 8.30.1),
+  uv is required at that exact version, and a test holds the versions repeated
+  in the Dockerfile, CI and pre-commit to their source.
+
 ## [0.3.3] - 2026-09-27
 
 ### Fixed
