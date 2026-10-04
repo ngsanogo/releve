@@ -17,9 +17,9 @@ adheres to [Semantic Versioning](https://semver.org/).
   pinned by digest, and every dependency is pinned to an exact version
   (`==` in `pyproject.toml`).
 - The Home Assistant integration is tested against Home Assistant 2026.9.4.
-- Development: `mise.toml` names the toolchain (uv 0.12.22, gitleaks 8.30.1),
-  and a test holds the versions repeated in the Dockerfile, CI and pre-commit
-  to their source.
+- Development: `mise.toml` names the toolchain (uv 0.12.22, gitleaks 8.30.1,
+  and mise 2026.10.2 or later through `min_version`), and a test holds the
+  versions repeated in the Dockerfile, CI and pre-commit to their source.
 
 ## [0.3.3] - 2026-09-27
 
