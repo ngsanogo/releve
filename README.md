@@ -75,7 +75,7 @@ file holds a gateway token. Give the file to the uid that has to read it, or
 keep the token out of it entirely and pass `RELEVE_GATEWAY__TOKEN` in the
 environment, which every key supports (see [Configuration](#configuration)).
 
-Or with Python 3.14 (uv fetches it when the machine has none):
+Or with Python 3.14 (uv fetches it if it is missing):
 
 ```bash
 uv tool install git+https://github.com/ngsanogo/releve@v0.3.3

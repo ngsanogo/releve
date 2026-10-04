@@ -1,7 +1,8 @@
 version: 2
 
-# One schedule for every ecosystem: Monday 05:00, Europe/Paris. Minor and patch
-# updates arrive grouped; a major arrives alone, as the decision it is.
+# One schedule for every ecosystem: Monday 05:00, Europe/Paris, so a week's
+# updates arrive together. Minor and patch updates are grouped; a major arrives
+# alone, as the decision it is.
 #
 # Versions are exact here (pyproject.toml, tests_ha/requirements.txt, Dockerfile),
 # and some are written in more than one file. tests/test_toolchain_pins.py turns
