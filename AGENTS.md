@@ -18,7 +18,8 @@ JSON / Prometheus surface. A HACS Home Assistant integration lives in
 `custom_components/releve/` (JSON API client only; it never imports the
 `releve` package).
 
-**Stack:** Python ≥ 3.12, [uv](https://docs.astral.sh/uv/), Pydantic, Starlette,
+**Stack:** Python 3.14 (one version, named by `.python-version`: the image runs
+it and CI tests on it), [uv](https://docs.astral.sh/uv/), Pydantic, Starlette,
 SQLite, Ruff, mypy, pytest. License: Apache-2.0 (see `LICENSE` and `NOTICE`).
 
 Only OSI-permissive, commercially reusable tooling belongs in the distributed
@@ -39,10 +40,17 @@ locally means the same checks as the pipeline.
 | `make fmt` | Apply Ruff fixes and formatting |
 | `make help` | List all targets |
 
-`uv` owns Python versions, the lockfile and every dependency. Do not invent
+`uv` owns the Python version, the lockfile and every dependency. Do not invent
 parallel pip/venv workflows for the main package. The Home Assistant integration
-uses a separate env (`.venv-ha`, Python 3.14) built from
+uses a separate env (`.venv-ha`, same Python) built from
 `tests_ha/requirements.txt` — `make test-ha` manages it.
+
+**Versions are exact, each with one source.** `mise.toml` names uv and gitleaks
+(`mise install`; `mise.lock` holds their checksums), `.python-version` names
+Python, `pyproject.toml` pins every dependency with `==`. The other places that
+repeat a number (Dockerfile, CI, pre-commit) are held to those by
+`tests/test_toolchain_pins.py`. Move a version at its source, then run
+`uv lock` / `mise lock` as the case may be.
 
 ## Layout
 

@@ -4,7 +4,7 @@
 [![CodeQL](https://github.com/ngsanogo/releve/actions/workflows/codeql.yml/badge.svg)](https://github.com/ngsanogo/releve/actions/workflows/codeql.yml)
 [![Release](https://img.shields.io/github/v/release/ngsanogo/releve?include_prereleases)](https://github.com/ngsanogo/releve/releases)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](pyproject.toml)
+[![Python 3.14](https://img.shields.io/badge/python-3.14-blue.svg)](.python-version)
 
 *releve* (from *relevé*, a meter reading) keeps a complete local history of a
 French electricity meter and feeds it to Home Assistant, MQTT and
@@ -75,7 +75,7 @@ file holds a gateway token. Give the file to the uid that has to read it, or
 keep the token out of it entirely and pass `RELEVE_GATEWAY__TOKEN` in the
 environment, which every key supports (see [Configuration](#configuration)).
 
-Or with Python 3.12+:
+Or with Python 3.14 (uv fetches it when the machine has none):
 
 ```bash
 uv tool install git+https://github.com/ngsanogo/releve@v0.3.3
@@ -235,17 +235,18 @@ configuration or database, 3 another pass is already running.
 ## Development
 
 ```bash
-uv sync                          # dependencies, including the dev group
+mise install                     # uv and gitleaks, at the versions mise.toml names
+uv sync                          # Python (.python-version) and the dependencies, dev group included
 uv run pytest                    # tests
 uv run ruff check src tests custom_components tests_ha
 uv run ruff format --check src tests custom_components tests_ha
 uv run mypy                      # strict
 
 # The Home Assistant integration, in its own environment (Home Assistant pins its libraries):
-uv venv --python 3.14 --allow-existing .venv-ha && uv pip install --python .venv-ha -r tests_ha/requirements.txt
+uv venv --allow-existing .venv-ha && uv pip install --python .venv-ha -r tests_ha/requirements.txt
 .venv-ha/bin/python -m mypy --config-file tests_ha/mypy.ini custom_components/releve
 (cd tests_ha && ../.venv-ha/bin/python -m pytest)
-uvx pre-commit install           # optional: ruff and gitleaks before each commit
+uv run pre-commit install        # optional: ruff and gitleaks before each commit
 ```
 
 The design is written down in [docs/architecture.md](docs/architecture.md) and
