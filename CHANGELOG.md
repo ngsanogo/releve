@@ -13,11 +13,11 @@ adheres to [Semantic Versioning](https://semver.org/).
   with `uv tool install` moves to Python 3.14 at its next upgrade — uv fetches
   it by itself. The Home Assistant integration is unaffected: it runs on Home
   Assistant's own Python.
-- The image is built from `python:3.14.8-slim-trixie` with uv 0.12.22, both
+- The image is built from `python:3.14.8-slim-trixie` with uv 0.12.23, both
   pinned by digest, and every dependency is pinned to an exact version
   (`==` in `pyproject.toml`).
 - The Home Assistant integration is tested against Home Assistant 2026.9.4.
-- Development: `mise.toml` names the toolchain (uv 0.12.22, gitleaks 8.30.1,
+- Development: `mise.toml` names the toolchain (uv 0.12.23, gitleaks 8.30.1,
   and mise 2026.10.2 or later through `min_version`), and a test holds the
   versions repeated in the Dockerfile, CI and pre-commit to their source.
 
