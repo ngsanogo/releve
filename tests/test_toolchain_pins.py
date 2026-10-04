@@ -46,6 +46,23 @@ def test_uv_is_one_version_everywhere() -> None:
         assert step.get("with", {}).get("version") == uv, workflow_name
 
 
+def test_ci_runs_the_mise_mise_toml_requires() -> None:
+    """mise refuses to run below `min_version`; mise-action given no `version` takes the newest."""
+    mise = tomllib.loads(read("mise.toml"))["min_version"]
+    assert re.fullmatch(r"\d+\.\d+\.\d+", mise), "an exact version, not a floating one"
+
+    steps = [
+        (workflow.name, step)
+        for workflow in sorted((ROOT / ".github/workflows").glob("*.yml"))
+        for job in yaml.safe_load(workflow.read_text(encoding="utf-8"))["jobs"].values()
+        for step in job.get("steps", [])
+        if step.get("uses", "").startswith("jdx/mise-action@")
+    ]
+    assert steps, "no mise-action step found: the workflows changed shape"
+    for workflow_name, step in steps:
+        assert step.get("with", {}).get("version") == mise, workflow_name
+
+
 def test_uv_is_not_required_at_an_exact_version() -> None:
     """Dependabot's uv updater runs its own uv; under `required-version` uv refuses to run."""
     assert "required-version" not in tomllib.loads(read("pyproject.toml")).get("tool", {}).get(

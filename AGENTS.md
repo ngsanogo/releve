@@ -45,11 +45,12 @@ parallel pip/venv workflows for the main package. The Home Assistant integration
 uses a separate env (`.venv-ha`, same Python) built from
 `tests_ha/requirements.txt` — `make test-ha` manages it.
 
-**Versions are exact, each with one source.** `mise.toml` names uv and gitleaks
-(`mise install`; `mise.lock` holds their checksums), `.python-version` names
-Python, `pyproject.toml` pins every dependency with `==`. The other places that
-repeat a number (Dockerfile, the workflows' `setup-uv` steps, the build backend,
-pre-commit) are held to those by `tests/test_toolchain_pins.py`. Move a version
+**Versions are exact, each with one source.** `mise.toml` names mise itself
+(`min_version`), uv and gitleaks (`mise install`; `mise.lock` holds their
+checksums), `.python-version` names Python, `pyproject.toml` pins every
+dependency with `==`. The other places that repeat a number (Dockerfile, the
+workflows' `setup-uv` and `mise-action` steps, the build backend, pre-commit)
+are held to those by `tests/test_toolchain_pins.py`. Move a version
 at its source and everywhere the test names, then run `uv lock` / `mise lock`
 as the case may be. Do not add `[tool.uv] required-version`: Dependabot's uv
 updater runs its own uv and would then fail every Python update.

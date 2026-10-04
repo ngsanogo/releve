@@ -20,6 +20,12 @@
 # (Dockerfile, the workflows, pyproject.toml's build backend,
 # .pre-commit-config.yaml) to this file.
 
+# mise itself. mise refuses to run below this version, so `make` and CI run the
+# same one. CI's `jdx/mise-action` cannot read this line and, given no
+# `version`, installs the newest release a day old: each of its steps repeats
+# the number, and the test holds them to it.
+min_version = "2026.10.2"
+
 [tools]
 gitleaks = "8.30.1"
 uv = "0.12.22"
