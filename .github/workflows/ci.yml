@@ -13,9 +13,10 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# Neither uv's version nor Python's is written in this file. setup-uv installs
-# the uv that pyproject.toml requires (`[tool.uv] required-version`), and uv
-# installs the one Python .python-version names — the Python the image runs.
+# Python's version is not written in this file: uv installs the one
+# .python-version names — the Python the image runs. uv's own version is, on
+# every setup-uv step: it is mise.toml's, and tests/test_toolchain_pins.py
+# holds each of them to it.
 
 jobs:
   lint:
@@ -27,6 +28,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
+          version: "0.12.22"
           enable-cache: true
       - run: uv sync --frozen
       - run: uv run ruff check src tests custom_components tests_ha
@@ -47,6 +49,7 @@ jobs:
         run: docker run --detach --publish 127.0.0.1:1883:1883 eclipse-mosquitto:2.1.2-alpine@sha256:38c0da4f2ef84284d47b3b3eeea1cb3bdeabe81ee10caf0cd5c5ff61ee3ea408 mosquitto -c /mosquitto-no-auth.conf
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
+          version: "0.12.22"
           enable-cache: true
       - run: uv sync --frozen
       - run: uv run pytest --cov --cov-report=term-missing --cov-fail-under=90
@@ -71,6 +74,7 @@ jobs:
           comment: false
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
+          version: "0.12.22"
           enable-cache: true
       # Its own environment: Home Assistant pins libraries releve also locks.
       - run: |
@@ -91,6 +95,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
+          version: "0.12.22"
           enable-cache: true
       - run: uv sync --frozen
       - name: Audit the locked production dependencies
@@ -106,6 +111,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.12.22"
       - run: uv build
       - name: Install the wheel alone and use it
         env:
