@@ -2,10 +2,14 @@
 #
 #   mise install     # after a clone, and after this file changes
 #
-# uv is exact because pyproject.toml requires it exactly (`[tool.uv]
-# required-version`): a machine-wide "latest" uv would refuse to run here the
-# day it moves. gitleaks is what `make secrets` and CI's secret scan run; CI
-# installs it from this file (`jdx/mise-action`), so both scan with one binary.
+# uv is the uv of the image (Dockerfile) and of CI (setup-uv's `version`): the
+# lock is written here by the uv that reads it there. gitleaks is what
+# `make secrets` and CI's secret scan run; CI installs it from this file
+# (`jdx/mise-action`), so both scan with one binary.
+#
+# pyproject.toml carries no `[tool.uv] required-version` on purpose: Dependabot's
+# uv updater runs its own uv, and uv refuses to run under any version but the
+# required one — every Python update would fail.
 #
 # `mise.lock`, beside this file and tracked, holds the checksum of each artefact
 # for linux-arm64 and linux-x64 (the runner). After changing a version:
@@ -13,7 +17,8 @@
 #
 # Python is not here: uv installs the one .python-version names.
 # tests/test_toolchain_pins.py holds every other mention of these versions
-# (Dockerfile, pyproject.toml, .pre-commit-config.yaml) to this file.
+# (Dockerfile, the workflows, pyproject.toml's build backend,
+# .pre-commit-config.yaml) to this file.
 
 [tools]
 gitleaks = "8.30.1"
