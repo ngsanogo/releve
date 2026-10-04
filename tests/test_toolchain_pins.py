@@ -10,6 +10,8 @@ import re
 import tomllib
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -28,9 +30,27 @@ def test_uv_is_one_version_everywhere() -> None:
     """mise installs it on a workstation, setup-uv in CI, the Dockerfile in the image."""
     uv = tomllib.loads(read("mise.toml"))["tools"]["uv"]
     pyproject = tomllib.loads(read("pyproject.toml"))
-    assert pyproject["tool"]["uv"]["required-version"] == f"=={uv}"
     assert pyproject["build-system"]["requires"] == [f"uv_build=={uv}"]
     assert re.findall(r"astral-sh/uv:([\w.]+)@sha256:", read("Dockerfile")) == [uv]
+
+    # Without `version`, setup-uv installs the latest uv: every step must name it.
+    steps = [
+        (workflow.name, step)
+        for workflow in sorted((ROOT / ".github/workflows").glob("*.yml"))
+        for job in yaml.safe_load(workflow.read_text(encoding="utf-8"))["jobs"].values()
+        for step in job.get("steps", [])
+        if step.get("uses", "").startswith("astral-sh/setup-uv@")
+    ]
+    assert steps, "no setup-uv step found: the workflows changed shape"
+    for workflow_name, step in steps:
+        assert step.get("with", {}).get("version") == uv, workflow_name
+
+
+def test_uv_is_not_required_at_an_exact_version() -> None:
+    """Dependabot's uv updater runs its own uv; under `required-version` uv refuses to run."""
+    assert "required-version" not in tomllib.loads(read("pyproject.toml")).get("tool", {}).get(
+        "uv", {}
+    )
 
 
 def test_the_commit_hook_and_ci_scan_with_the_same_gitleaks() -> None:

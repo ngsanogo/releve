@@ -13,9 +13,9 @@ make setup      # dependencies, the Home Assistant environment, the pre-commit h
 make check      # everything CI checks, in CI's order
 ```
 
-uv is required at one exact version (`[tool.uv] required-version` in
-`pyproject.toml`) and installs the one Python `.python-version` names; without
-[mise](https://mise.jdx.dev), install that uv version by hand.
+uv installs the one Python `.python-version` names. Without
+[mise](https://mise.jdx.dev), install by hand the uv version `mise.toml` names:
+it is the one CI and the image use.
 
 `make help` lists the rest. Every target mirrors one job of
 `.github/workflows/ci.yml`, so green here and green there mean the same thing —

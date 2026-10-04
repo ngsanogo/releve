@@ -4,9 +4,9 @@ version: 2
 # updates arrive grouped; a major arrives alone, as the decision it is.
 #
 # Versions are exact here (pyproject.toml, tests_ha/requirements.txt, Dockerfile),
-# and some are written in more than one file. tests/test_toolchain_pins.py and
-# uv's own `required-version` turn a half-moved pin red: the pull request then
-# needs the other file moved by hand (mise.toml and .python-version are not
+# and some are written in more than one file. tests/test_toolchain_pins.py turns
+# a half-moved pin red: the pull request then needs the other files moved by
+# hand (mise.toml, .python-version and the workflows' setup-uv version are not
 # watched by Dependabot).
 updates:
   - package-ecosystem: "uv"
@@ -16,9 +16,18 @@ updates:
       day: "monday"
       time: "05:00"
       timezone: "Europe/Paris"
+    # tests_ha/requirements.txt belongs to the "pip" entry below. Without this,
+    # both entries open the same pull request.
+    exclude-paths:
+      - "tests_ha/**"
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
+    ignore:
+      # The build backend is uv itself: it moves with uv (mise.toml, Dockerfile,
+      # the workflows), announced by the "docker" entry's pull request. Bumped
+      # here, it would turn the whole weekly Python group red.
+      - dependency-name: "uv-build"
 
   # The Home Assistant the integration is tested against (tests_ha/requirements.txt):
   # pytest-homeassistant-custom-component pins homeassistant, one release each —

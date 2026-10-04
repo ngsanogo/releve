@@ -48,9 +48,11 @@ uses a separate env (`.venv-ha`, same Python) built from
 **Versions are exact, each with one source.** `mise.toml` names uv and gitleaks
 (`mise install`; `mise.lock` holds their checksums), `.python-version` names
 Python, `pyproject.toml` pins every dependency with `==`. The other places that
-repeat a number (Dockerfile, CI, pre-commit) are held to those by
-`tests/test_toolchain_pins.py`. Move a version at its source, then run
-`uv lock` / `mise lock` as the case may be.
+repeat a number (Dockerfile, the workflows' `setup-uv` steps, the build backend,
+pre-commit) are held to those by `tests/test_toolchain_pins.py`. Move a version
+at its source and everywhere the test names, then run `uv lock` / `mise lock`
+as the case may be. Do not add `[tool.uv] required-version`: Dependabot's uv
+updater runs its own uv and would then fail every Python update.
 
 ## Layout
 
