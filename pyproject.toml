@@ -1,5 +1,5 @@
 [build-system]
-requires = ["uv_build>=0.12.7,<0.13"]
+requires = ["uv_build==0.12.22"]
 build-backend = "uv_build"
 
 [project]
@@ -7,7 +7,7 @@ name = "releve"
 version = "0.3.3"
 description = "Self-hosted, quota-aware cache of French electricity meter readings, with Home Assistant, MQTT and InfluxDB/VictoriaMetrics exports."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [{ name = "Issa Sanogo" }]
@@ -27,21 +27,20 @@ classifiers = [
   "Natural Language :: English",
   "Operating System :: POSIX",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.12",
-  "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
   "Topic :: Home Automation",
   "Typing :: Typed",
 ]
+# Exact versions: releve ships as an image, not as a library.
 dependencies = [
-  "httpx2>=2.9",
-  "jinja2>=3.1.6",
-  "paho-mqtt>=2.1",
-  "pydantic>=2.11",
-  "pydantic-settings[yaml]>=2.10",
-  "starlette>=0.47",
-  "uvicorn>=0.35",
-  "websockets>=15",
+  "httpx2==2.13.1",
+  "jinja2==3.1.6",
+  "paho-mqtt==2.1.0",
+  "pydantic==2.13.5",
+  "pydantic-settings[yaml]==2.15.0",
+  "starlette==1.7.0",
+  "uvicorn==0.54.0",
+  "websockets==17.2",
 ]
 
 [project.urls]
@@ -54,18 +53,24 @@ releve = "releve.cli:run"
 
 [dependency-groups]
 dev = [
-  "hypothesis>=6.130",
-  "mypy>=1.16",
-  "pip-audit>=2.9",
-  "pytest>=8.4",
-  "pytest-cov>=6.2",
-  "ruff>=0.12",
-  "types-PyYAML>=6.0",
+  "hypothesis==6.168.3",
+  "mypy==2.4.0",
+  "pip-audit==2.10.1",
+  "pre-commit==4.6.2",
+  "pytest==9.1.1",
+  "pytest-cov==7.1.0",
+  "ruff==0.16.10",
+  "types-PyYAML==6.0.12.20260906",
 ]
+
+# One uv everywhere: the Dockerfile's image carries the same number, and CI's
+# setup-uv installs the version it reads here.
+[tool.uv]
+required-version = "==0.12.22"
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py314"
 src = ["src", "."]  # ".": tests, tests_ha and custom_components are first-party
 
 [tool.ruff.lint]
@@ -106,7 +111,7 @@ select = [
 
 [tool.mypy]
 strict = true
-python_version = "3.12"
+python_version = "3.14"
 mypy_path = "src"
 packages = ["releve", "tests"]
 warn_unreachable = true

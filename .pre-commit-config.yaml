@@ -1,4 +1,4 @@
-# Install once: uvx pre-commit install
+# Install once: uv run pre-commit install (pre-commit itself comes from uv.lock)
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
