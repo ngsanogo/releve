@@ -235,23 +235,13 @@ configuration or database, 3 another pass is already running.
 ## Development
 
 ```bash
-mise install                     # uv and gitleaks, at the versions mise.toml names
-uv sync                          # Python (.python-version) and the dependencies, dev group included
-uv run pytest                    # tests
-uv run ruff check src tests custom_components tests_ha
-uv run ruff format --check src tests custom_components tests_ha
-uv run mypy                      # strict
-
-# The Home Assistant integration, in its own environment (Home Assistant pins its libraries):
-uv venv --allow-existing .venv-ha && uv pip install --python .venv-ha -r tests_ha/requirements.txt
-.venv-ha/bin/python -m mypy --config-file tests_ha/mypy.ini custom_components/releve
-(cd tests_ha && ../.venv-ha/bin/python -m pytest)
-uv run pre-commit install        # optional: ruff and gitleaks before each commit
+mise install && make setup && make check
 ```
 
-The design is written down in [docs/architecture.md](docs/architecture.md) and
-the [ADRs](docs/adr). Contributions are welcome, in English or French — see
-[CONTRIBUTING.md](CONTRIBUTING.md).
+[CONTRIBUTING.md](CONTRIBUTING.md) says what each step does, which CI jobs
+`make check` covers and which it leaves to CI, and the conventions a change
+follows. The design is written down in [docs/architecture.md](docs/architecture.md)
+and the [ADRs](docs/adr). Contributions are welcome, in English or French.
 
 ## License and notices
 
