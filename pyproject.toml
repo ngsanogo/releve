@@ -36,9 +36,9 @@ dependencies = [
   "httpx2==2.13.1",
   "jinja2==3.1.6",
   "paho-mqtt==2.1.0",
-  "pydantic==2.14.0",
+  "pydantic==2.14.1",
   "pydantic-settings[yaml]==2.15.0",
-  "starlette==1.7.0",
+  "starlette==1.8.0",
   "uvicorn==0.54.0",
   "websockets==17.2",
 ]
@@ -53,13 +53,13 @@ releve = "releve.cli:run"
 
 [dependency-groups]
 dev = [
-  "hypothesis==6.168.3",
+  "hypothesis==6.169.1",
   "mypy==2.4.0",
   "pip-audit==2.10.1",
-  "pre-commit==4.6.2",
+  "pre-commit==4.7.0",
   "pytest==9.1.1",
   "pytest-cov==7.1.0",
-  "ruff==0.16.10",
+  "ruff==0.17.0",
   "types-PyYAML==6.0.12.20260906",
 ]
 
