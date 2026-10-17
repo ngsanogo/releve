@@ -1,9 +1,14 @@
 # releve — every command this repository has, in one place.
 #
-# `make check` is what CI runs, in the order CI runs it (.github/workflows/ci.yml).
-# Green here and green there mean the same thing, which is the only reason this
-# file exists: the commands used to live as prose in CONTRIBUTING.md, where a
-# flag drifts from the workflow without anything noticing.
+# Each target runs the commands of one CI job (.github/workflows/ci.yml), so a
+# target green here is its job green there. That is the only reason this file
+# exists: the commands used to live as prose in CONTRIBUTING.md, where a flag
+# drifts from the workflow without anything noticing.
+#
+# `make check` covers CI's lint, test, home-assistant (less hassfest and HACS,
+# see test-ha) and audit jobs, in CI's order. CI's package, image and secrets
+# jobs are not in it: they run only in CI, unless their targets below are
+# called by name.
 #
 # One tool: uv. It owns the Python version (.python-version), the lockfile and
 # every dev dependency; nothing here needs a Python on the machine. uv itself,
@@ -40,9 +45,9 @@ setup: ## Once after a clone: dependencies, the Home Assistant environment, the 
 	uv venv --allow-existing $(HA_VENV)
 	uv pip install --quiet --python $(HA_VENV) -r tests_ha/requirements.txt
 	uv run pre-commit install
-	@echo "✔ ready — 'make check' is what CI runs."
+	@echo "✔ ready — 'make check' runs CI's lint, test, home-assistant and audit jobs."
 
-check: lint typecheck test test-ha audit ## Everything CI checks, in CI's order
+check: lint typecheck test test-ha audit ## CI's lint, test, home-assistant and audit jobs
 
 # --- What CI's `lint` job runs ---------------------------------------------
 lint: ## ruff: rules and formatting, checked not applied
