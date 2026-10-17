@@ -4,16 +4,15 @@ Date: 2026-09-19 · Status: accepted
 
 ## Context
 
-A week of operation next to Home Assistant showed what a deployment had to
-make up for:
+A deployment had to make up for three shortcomings:
 
 - **No way to copy the database.** A deployment had to run its own Python
   script inside the container to call SQLite's backup API: it had to know the
   image ships an interpreter, where the database is, and that a file copy of
   a WAL database proves nothing.
-- **A journal that cried wolf.** Every night the first pass after midnight
-  asked for a day Enedis had not published yet; the gateway answered 404 and
-  releve journaled a failure — six nights out of six, each gone by the morning.
+- **A journal that cried wolf.** The first pass after midnight asked for a day
+  Enedis had not published yet; the gateway answered 404 and releve journaled
+  a failure — every night, for a day a later pass fetched without trouble.
   The image listens on `0.0.0.0` by construction, so every start logged a
   warning about it. And a block was journaled in UTC (`until 09:00 UTC`) next to
   an event time in Paris time (`10:43`): it read as already over.

@@ -30,13 +30,18 @@ environment into the package or image.
 
 ## Command surface
 
-Prefer the Makefile. Targets mirror CI (`.github/workflows/ci.yml`): green
-locally means the same checks as the pipeline.
+Prefer the Makefile. Each target runs the commands of one CI job
+(`.github/workflows/ci.yml`). `make check` covers CI's `lint`, `test`,
+`home-assistant` (minus hassfest and HACS, which are actions) and `audit` jobs.
+CI's `package`, `image` and `secrets` jobs are not in it: they run only in CI,
+unless their targets are called by name. A green `make check` says nothing
+about those three.
 
 | Command | Purpose |
 | --- | --- |
 | `make setup` | Once after clone: deps, HA venv, pre-commit hooks |
-| `make check` | Full gate: lint + typecheck + test + test-ha + audit |
+| `make check` | The local gate: lint + typecheck + test + test-ha + audit |
+| `make package` / `make image` / `make secrets` | CI's other three jobs, not in `make check` |
 | `make fmt` | Apply Ruff fixes and formatting |
 | `make help` | List all targets |
 
