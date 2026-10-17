@@ -16,7 +16,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 - The image is built from `python:3.14.8-slim-trixie` with uv 0.12.23, both
   pinned by digest, and every dependency is pinned to an exact version
   (`==` in `pyproject.toml`).
-- The Home Assistant integration is tested against Home Assistant 2026.9.4.
+- The Home Assistant integration is tested against Home Assistant 2026.10.2.
+  Config flows use probatio, the validator those flow types expect.
 - Development: `mise.toml` names the toolchain (uv 0.12.23, gitleaks 8.30.1,
   and mise 2026.10.2 or later through `min_version`), and a test holds the
   versions repeated in the Dockerfile, CI and pre-commit to their source.
