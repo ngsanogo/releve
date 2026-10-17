@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-10-17
+
 ### Changed
 - **Python 3.14 only.** releve is built, tested and shipped on one Python,
   3.14.8 (`.python-version`); 3.12 and 3.13 are no longer supported. Nothing
@@ -171,7 +173,8 @@ First release.
 - One-way import of databases in the earlier SQLAlchemy layout, with a backup.
 - Container image for amd64 and arm64.
 
-[Unreleased]: https://github.com/ngsanogo/releve/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/ngsanogo/releve/compare/v0.3.4...HEAD
+[0.3.4]: https://github.com/ngsanogo/releve/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/ngsanogo/releve/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/ngsanogo/releve/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/ngsanogo/releve/compare/v0.3.0...v0.3.1
