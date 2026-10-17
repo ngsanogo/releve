@@ -25,7 +25,8 @@ HA_VENV    := .venv-ha
 
 # The MQTT exporter's integration test needs a broker, and skips itself without
 # one — a skip that looks like a pass. CI starts mosquitto for it; so does
-# `make test`, on the loopback and on a port nothing else on this machine holds.
+# `make test`, on the loopback and on MQTT's default port, 1883. Where another
+# broker already holds it, `make test MQTT_PORT=1884` (any free port) moves it.
 MQTT_PORT      := 1883
 MQTT_CONTAINER := releve-test-mqtt
 MQTT_IMAGE     := eclipse-mosquitto:2.1.2-alpine@sha256:38c0da4f2ef84284d47b3b3eeea1cb3bdeabe81ee10caf0cd5c5ff61ee3ea408
