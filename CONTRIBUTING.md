@@ -10,7 +10,7 @@ Prefer that single file over any vendor-specific rules file.
 ```bash
 mise install    # uv and gitleaks, at the versions mise.toml names
 make setup      # dependencies, the Home Assistant environment, the pre-commit hooks
-make check      # everything CI checks, in CI's order
+make check      # CI's lint, test, home-assistant and audit jobs, in CI's order
 ```
 
 uv installs the one Python `.python-version` names. Without
@@ -18,20 +18,25 @@ uv installs the one Python `.python-version` names. Without
 it is the one CI and the image use.
 
 `make help` lists the rest. Every target mirrors one job of
-`.github/workflows/ci.yml`, so green here and green there mean the same thing —
-which is why these commands are a Makefile rather than a list to copy from a
-page that drifts from the workflow.
+`.github/workflows/ci.yml` and runs that job's commands, so a target green here
+is its job green there — which is why these commands are a Makefile rather than
+a list to copy from a page that drifts from the workflow.
 
-| Target | The CI job it mirrors |
-| --------- | ------------------------------------------------------------- |
-| `lint` | `lint` — ruff's rules and formatting, checked, not applied |
-| `typecheck` | `lint` — mypy, strict, over the sources and the tests |
-| `test` | `test` — pytest with coverage, against a throwaway MQTT broker |
-| `test-ha` | `home-assistant` — minus hassfest and HACS, which are actions |
-| `audit` | `audit` — known vulnerabilities in the locked production set |
-| `package` | `package` — the wheel, used from an environment that has nothing else |
-| `image` | `image` — one architecture here, two on the runner |
-| `secrets` | `secrets` — the same gitleaks version |
+`make check` does not run all of them. It covers CI's `lint`, `test`,
+`home-assistant` and `audit` jobs; CI's `package`, `image` and `secrets` jobs
+run only in CI, unless you call their targets by name. A green `make check`
+says nothing about those three.
+
+| Target | The CI job it mirrors | In `make check` |
+| --------- | ------------------------------------------------------------- | --- |
+| `lint` | `lint` — ruff's rules and formatting, checked, not applied | yes |
+| `typecheck` | `lint` — mypy, strict, over the sources and the tests | yes |
+| `test` | `test` — pytest with coverage, against a throwaway MQTT broker | yes |
+| `test-ha` | `home-assistant` — minus hassfest and HACS, which are actions | yes |
+| `audit` | `audit` — known vulnerabilities in the locked production set | yes |
+| `package` | `package` — the wheel, used from an environment that has nothing else | no |
+| `image` | `image` — one architecture here, two on the runner | no |
+| `secrets` | `secrets` — the same gitleaks version | no |
 
 `make test` starts the MQTT broker itself and removes it afterwards. That
 matters: `tests/test_exporter_mqtt.py` is the one test that proves the exporter
