@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from typing import Any
 from urllib.parse import urlsplit
 
-import voluptuous as vol
+import probatio
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_TOKEN, CONF_URL
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -20,15 +20,15 @@ from .api import ReleveAuthError, ReleveClient, ReleveError
 from .const import DEFAULT_URL, DOCS_URL, DOMAIN
 
 _TOKEN = TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD))
-USER_SCHEMA = vol.Schema(
+USER_SCHEMA = probatio.Schema(
     {
-        vol.Required(CONF_URL, default=DEFAULT_URL): TextSelector(
+        probatio.Required(CONF_URL, default=DEFAULT_URL): TextSelector(
             TextSelectorConfig(type=TextSelectorType.URL)
         ),
-        vol.Optional(CONF_TOKEN): _TOKEN,
+        probatio.Optional(CONF_TOKEN): _TOKEN,
     }
 )
-REAUTH_SCHEMA = vol.Schema({vol.Required(CONF_TOKEN): _TOKEN})
+REAUTH_SCHEMA = probatio.Schema({probatio.Required(CONF_TOKEN): _TOKEN})
 
 
 def normalize_url(url: str) -> str:
