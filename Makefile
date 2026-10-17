@@ -1,9 +1,14 @@
 # releve — every command this repository has, in one place.
 #
-# `make check` is what CI runs, in the order CI runs it (.github/workflows/ci.yml).
-# Green here and green there mean the same thing, which is the only reason this
-# file exists: the commands used to live as prose in CONTRIBUTING.md, where a
-# flag drifts from the workflow without anything noticing.
+# Each target runs the commands of one CI job (.github/workflows/ci.yml), so a
+# target green here is its job green there. That is the only reason this file
+# exists: the commands used to live as prose in CONTRIBUTING.md, where a flag
+# drifts from the workflow without anything noticing.
+#
+# `make check` covers CI's lint, test, home-assistant (less hassfest and HACS,
+# see test-ha) and audit jobs, in CI's order. CI's package, image and secrets
+# jobs are not in it: they run only in CI, unless their targets below are
+# called by name.
 #
 # One tool: uv. It owns the Python version (.python-version), the lockfile and
 # every dev dependency; nothing here needs a Python on the machine. uv itself,
@@ -20,7 +25,8 @@ HA_VENV    := .venv-ha
 
 # The MQTT exporter's integration test needs a broker, and skips itself without
 # one — a skip that looks like a pass. CI starts mosquitto for it; so does
-# `make test`, on the loopback and on a port nothing else on this machine holds.
+# `make test`, on the loopback and on MQTT's default port, 1883. Where another
+# broker already holds it, `make test MQTT_PORT=1884` (any free port) moves it.
 MQTT_PORT      := 1883
 MQTT_CONTAINER := releve-test-mqtt
 MQTT_IMAGE     := eclipse-mosquitto:2.1.2-alpine@sha256:38c0da4f2ef84284d47b3b3eeea1cb3bdeabe81ee10caf0cd5c5ff61ee3ea408
@@ -40,9 +46,9 @@ setup: ## Once after a clone: dependencies, the Home Assistant environment, the 
 	uv venv --allow-existing $(HA_VENV)
 	uv pip install --quiet --python $(HA_VENV) -r tests_ha/requirements.txt
 	uv run pre-commit install
-	@echo "✔ ready — 'make check' is what CI runs."
+	@echo "✔ ready — 'make check' runs CI's lint, test, home-assistant and audit jobs."
 
-check: lint typecheck test test-ha audit ## Everything CI checks, in CI's order
+check: lint typecheck test test-ha audit ## CI's lint, test, home-assistant and audit jobs
 
 # --- What CI's `lint` job runs ---------------------------------------------
 lint: ## ruff: rules and formatting, checked not applied
