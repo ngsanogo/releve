@@ -207,6 +207,7 @@ class Store:
                 f"{self.path} has schema version {version}, newer than this releve "
                 f"understands ({len(scripts)}) — upgrade releve"
             )
+        # One-shot upgrade from the old SQLAlchemy layout; no-op once user_version is set.
         if version == 0 and legacy.is_legacy_database(conn):
             backup = self._backup(now)
             log.warning("migrating a database in the legacy layout; backup kept at %s", backup)

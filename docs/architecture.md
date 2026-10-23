@@ -9,7 +9,7 @@ clock, errors, domain          the vocabulary (no dependencies)
         │
 config ─┤
         │
-store ──┴── legacy             SQLite; one-way import of the legacy layout
+store ──┴── legacy             SQLite; one-shot upgrade from the old layout
   │
 quota                          reservations and blocks, on the store
   │
@@ -36,7 +36,7 @@ cli                            composition root
 | `config.py` | YAML + environment settings, strict validation, upgrade hints |
 | `store.py` | The only SQL: schema migrations, metering upserts, change feed, quota bookkeeping |
 | `migrations/` | Numbered schema scripts; `PRAGMA user_version` records the last applied |
-| `legacy.py` | One-way import of a database in the earlier SQLAlchemy layout |
+| `legacy.py` | One-shot upgrade path for DBs still on the old SQLAlchemy layout |
 | `quota.py` | `QuotaGovernor`: reserve before sending, settle after, honor blocks |
 | `gateway.py` | The only HTTP to the gateway, and the parsing of its answers |
 | `curve.py` | Load-curve arithmetic, one series day at a time: complete grids, energy per interval |
@@ -78,16 +78,5 @@ Assistant (`tests_ha/`).
 
 ## Decisions
 
-The ADRs record why things are the way they are:
-
-- [0001 — Apache-2.0, written from scratch](adr/0001-apache-license.md)
-- [0002 — A quota governor reserves every call](adr/0002-quota-governor.md)
-- [0003 — Standard-library SQLite store](adr/0003-sqlite-store.md)
-- [0004 — Keep the history complete, not merely extended](adr/0004-complete-history.md)
-- [0005 — Exporters read the cache through cursors](adr/0005-export-cursors.md)
-- [0006 — Home Assistant series: pinned boundary, hourly rows](adr/0006-home-assistant-series.md)
-- [0007 — A small, synchronous runtime](adr/0007-small-synchronous-runtime.md)
-- [0008 — Hand-rolled Prometheus exposition](adr/0008-hand-rolled-prometheus.md)
-- [0009 — Partially published load-curve days](adr/0009-partial-load-curve-days.md)
-- [0010 — A Home Assistant integration over the JSON API](adr/0010-home-assistant-integration.md)
-- [0011 — Operated from its own commands, coupled by its API](adr/0011-operated-from-its-own-commands.md)
+Historical design notes live under [`docs/adr/`](adr/) — useful context, not
+constraints. Prefer this file and the code when behaviour is unclear.

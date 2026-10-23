@@ -54,7 +54,6 @@ really speaks MQTT, and without a broker it *skips*, which reads as a pass.
 - Commits follow [Conventional Commits](https://www.conventionalcommits.org)
   (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`).
 - User-visible changes get a line in `CHANGELOG.md` under `[Unreleased]`.
-- Design decisions worth remembering get an ADR in `docs/adr/`.
 
 ## Releases
 

@@ -1,83 +1,67 @@
 # Agent guide — releve
 
-Vendor-neutral instructions for any coding agent working in this repository.
-Human contributor conventions live in [`CONTRIBUTING.md`](CONTRIBUTING.md);
-architecture in [`docs/architecture.md`](docs/architecture.md) and
-[`docs/adr/`](docs/adr/).
+Vendor-neutral instructions for coding agents. Human conventions:
+[`CONTRIBUTING.md`](CONTRIBUTING.md). Deeper design notes (historical, not
+binding): [`docs/architecture.md`](docs/architecture.md).
 
-If a tool only reads a differently named file, point that file at this one
-(e.g. a symlink) rather than duplicating rules.
+If a tool only reads a differently named file, symlink it here rather than
+duplicating rules.
 
 ## Project
 
-Self-hosted, quota-aware local cache of French electricity meter readings from
+Self-hosted cache of French electricity meter readings from
 [MyElectricalData](https://www.myelectricaldata.fr). One process, one SQLite
-database, one YAML config. Syncs history within a daily call budget, then
-exports to Home Assistant, MQTT and InfluxDB/VictoriaMetrics, plus a small web /
-JSON / Prometheus surface. A HACS Home Assistant integration lives in
-`custom_components/releve/` (JSON API client only; it never imports the
-`releve` package).
+database, one YAML config. Syncs within a daily call budget, then exports to
+Home Assistant, MQTT and InfluxDB/VictoriaMetrics, plus a small web / JSON /
+Prometheus surface. HACS integration: `custom_components/releve/` (JSON API
+client only; never imports the `releve` package).
 
-**Stack:** Python 3.14 (one version, named by `.python-version`: the image runs
-it and CI tests on it), [uv](https://docs.astral.sh/uv/), Pydantic, Starlette,
-SQLite, Ruff, mypy, pytest. License: Apache-2.0 (see `LICENSE` and `NOTICE`).
+**Stack:** Python from `.python-version`, [uv](https://docs.astral.sh/uv/),
+Pydantic, Starlette, SQLite, Ruff, mypy, pytest. License: Apache-2.0.
 
-Only OSI-permissive, commercially reusable tooling belongs in the distributed
-product. Do not add proprietary SDKs, non-commercial-only licenses, GPL/AGPL
-runtime dependencies, or vendor-specific agent rule files. `tests_ha/` may pull
-Home Assistant (and its copyleft transitives) for CI only — never vendor that
-environment into the package or image.
+Only OSI-permissive tooling belongs in the distributed product. `tests_ha/` may
+pull Home Assistant for CI only — never vendor that into the package or image.
 
-## Command surface
+## Commands
 
-Prefer the Makefile. Each target runs the commands of one CI job
-(`.github/workflows/ci.yml`). `make check` covers CI's `lint`, `test`,
-`home-assistant` (minus hassfest and HACS, which are actions) and `audit` jobs.
-CI's `package`, `image` and `secrets` jobs are not in it: they run only in CI,
-unless their targets are called by name. A green `make check` says nothing
-about those three.
+One tool for the main package: **uv**. Prefer the Makefile; targets mirror CI
+(`.github/workflows/ci.yml`).
 
 | Command | Purpose |
 | --- | --- |
 | `make setup` | Once after clone: deps, HA venv, pre-commit hooks |
-| `make check` | The local gate: lint + typecheck + test + test-ha + audit |
-| `make package` / `make image` / `make secrets` | CI's other three jobs, not in `make check` |
+| `make check` | Local gate: lint + typecheck + test + test-ha + audit |
+| `make test` | pytest (starts a throwaway MQTT broker) |
 | `make fmt` | Apply Ruff fixes and formatting |
 | `make help` | List all targets |
 
-`uv` owns the Python version, the lockfile and every dependency. Do not invent
-parallel pip/venv workflows for the main package. The Home Assistant integration
-uses a separate env (`.venv-ha`, same Python) built from
-`tests_ha/requirements.txt` — `make test-ha` manages it.
+`make check` covers CI's `lint`, `test`, `home-assistant` (minus hassfest/HACS)
+and `audit`. CI's `package`, `image` and `secrets` are separate targets.
 
-**Versions are exact, each with one source.** `mise.toml` names mise itself
-(`min_version`), uv and gitleaks (`mise install`; `mise.lock` holds their
-checksums), `.python-version` names Python, `pyproject.toml` pins every
-dependency with `==`. The other places that repeat a number (Dockerfile, the
-workflows' `setup-uv` and `mise-action` steps, the build backend, pre-commit)
-are held to those by `tests/test_toolchain_pins.py`. Move a version
-at its source and everywhere the test names, then run `uv lock` / `mise lock`
-as the case may be. Do not add `[tool.uv] required-version`: Dependabot's uv
-updater runs its own uv and would then fail every Python update.
+The Home Assistant integration uses a second env (`.venv-ha`, same Python) from
+`tests_ha/requirements.txt` — `make test-ha` manages it. Do not invent parallel
+pip/venv workflows for the main package.
+
+**Pins:** each version has one source (`.python-version`, `mise.toml`,
+`pyproject.toml` with `==`). `tests/test_toolchain_pins.py` holds the rest in
+line. Change at the source, update what that test names, then `uv lock` /
+`mise lock` as needed. Do not add `[tool.uv] required-version`.
 
 ## Layout
 
 | Path | Role |
 | --- | --- |
-| `src/releve/` | Application (cli, sync, store, gateway, exporters, web) |
-| `tests/` | Unit and integration tests (pytest, 90% coverage floor) |
+| `src/releve/` | Application |
+| `tests/` | Unit and integration tests (90% coverage floor) |
 | `tests_ha/` | HA-core environment for the custom component |
 | `custom_components/releve/` | HACS integration |
-| `docs/` | Architecture + ADRs |
-| `contrib/grafana/` | Optional dashboard JSON |
+| `docs/` | Architecture notes |
 
-Domain types and contracts live in `domain.py`, `config.py` (Pydantic) and
-`errors.py`. Prefer those over prose when changing behaviour.
+Domain types live in `domain.py`, `config.py` and `errors.py`.
 
 ## Hard rules
 
-1. **Every gateway HTTP call goes through `QuotaGovernor.reserve`** — no other
-   path to the gateway.
+1. **Every gateway HTTP call goes through `QuotaGovernor.reserve`.**
 2. **Errors are typed** in `errors.py`; no empty `except` blocks.
 3. **Datetimes are timezone-aware** (Ruff `DTZ`). Instants as unix seconds UTC;
    Paris civil days as ISO dates.
@@ -85,7 +69,7 @@ Domain types and contracts live in `domain.py`, `config.py` (Pydantic) and
    with poorer answers.
 5. **Tests use fake tokens and PDLs** (e.g. `01234567890123`).
 6. **Behaviour change ⇒ failing test first**, then the fix.
-7. **Conventional Commits**; user-visible changes go in `CHANGELOG.md` under
+7. **Conventional Commits**; user-visible changes in `CHANGELOG.md` under
    `[Unreleased]`.
 8. **`cursor` / `export_cursor` means an exporter's resume position** in the
    cache's change feed.
@@ -93,4 +77,4 @@ Domain types and contracts live in `domain.py`, `config.py` (Pydantic) and
 ## Do not commit
 
 Runtime databases (`*.db*`), `config.yaml`, `.env`, secrets, coverage output,
-local venvs, Hypothesis / tool caches. See `.gitignore` and `.ignore`.
+local venvs, Hypothesis / tool caches. See `.gitignore`.

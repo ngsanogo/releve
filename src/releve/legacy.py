@@ -1,15 +1,12 @@
-"""One-way import of a database in the earlier, SQLAlchemy-based layout.
+"""One-shot upgrade from the earlier SQLAlchemy layout (kept for old installs).
 
-That layout stored naive local timestamps for metering data, naive UTC for
-bookkeeping, and a `schema_info` table instead of `user_version`.
-`Store.open` backs the file up, then calls these steps inside ONE transaction:
-set the old tables aside, create the current schema, copy the data over, drop
-the old tables. Either everything is migrated or nothing is.
+A no-op once `PRAGMA user_version` is set. Old layout: naive local timestamps
+for metering, naive UTC for bookkeeping, `schema_info` instead of
+`user_version`. `Store.open` backs the file up, then in ONE transaction: set
+old tables aside, create the current schema, copy data, drop legacy tables.
 
-What is kept: every metering row, Tempo and Ecowatt, today's gateway calls and
-active quota blocks (the budget must survive the upgrade), and the Home
-Assistant export boundaries (they anchor a cumulative series). What is not:
-the old sync journal, which does not match the run model.
+Kept: metering, Tempo/Ecowatt, today's gateway calls, active quota blocks, HA
+export boundaries. Dropped: the old sync journal (does not match the run model).
 """
 
 from __future__ import annotations
