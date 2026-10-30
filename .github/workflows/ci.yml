@@ -30,7 +30,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
-          version: "0.13.1"
+          version: "0.13.5"
           enable-cache: true
       - run: uv sync --frozen
       - run: uv run ruff check src tests custom_components tests_ha
@@ -52,7 +52,7 @@ jobs:
         run: docker run --detach --publish 127.0.0.1:1883:1883 eclipse-mosquitto:2.1.2-alpine@sha256:38c0da4f2ef84284d47b3b3eeea1cb3bdeabe81ee10caf0cd5c5ff61ee3ea408 mosquitto -c /mosquitto-no-auth.conf
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
-          version: "0.13.1"
+          version: "0.13.5"
           enable-cache: true
       - run: uv sync --frozen
       - run: uv run pytest --cov --cov-report=term-missing --cov-fail-under=90
@@ -78,7 +78,7 @@ jobs:
           comment: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
-          version: "0.13.1"
+          version: "0.13.5"
           enable-cache: true
       # Its own environment: Home Assistant pins libraries releve also locks.
       - run: |
@@ -100,7 +100,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
-          version: "0.13.1"
+          version: "0.13.5"
           enable-cache: true
       - run: uv sync --frozen
       - name: Audit the locked production dependencies
@@ -118,7 +118,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
-          version: "0.13.1"
+          version: "0.13.5"
       - run: uv build
       - name: Install the wheel alone and use it
         env:
