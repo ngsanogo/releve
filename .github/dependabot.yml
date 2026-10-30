@@ -4,6 +4,10 @@ version: 2
 # updates arrive together. Minor and patch updates are grouped; a major arrives
 # alone, as the decision it is.
 #
+# Every block waits seven days (cooldown) before a version bump. A yanked
+# release never becomes a pull request. Security updates are not delayed.
+# Subjects are `chore(deps):`, and the label is `dependencies`.
+#
 # Versions are exact here (pyproject.toml, tests_ha/requirements.txt, Dockerfile),
 # and some are written in more than one file. tests/test_toolchain_pins.py turns
 # a half-moved pin red: the pull request then needs the other files moved by
@@ -17,6 +21,15 @@ updates:
       day: "monday"
       time: "05:00"
       timezone: "Europe/Paris"
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: chore
+      prefix-development: chore
+      include: scope
     # tests_ha/requirements.txt belongs to the "pip" entry below. Without this,
     # both entries open the same pull request.
     exclude-paths:
@@ -41,6 +54,15 @@ updates:
       day: "monday"
       time: "05:00"
       timezone: "Europe/Paris"
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: chore
+      prefix-development: chore
+      include: scope
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
@@ -52,6 +74,15 @@ updates:
       day: "monday"
       time: "05:00"
       timezone: "Europe/Paris"
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: chore
+      prefix-development: chore
+      include: scope
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
@@ -67,6 +98,15 @@ updates:
       day: "monday"
       time: "05:00"
       timezone: "Europe/Paris"
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: chore
+      prefix-development: chore
+      include: scope
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
@@ -85,6 +125,15 @@ updates:
       day: "monday"
       time: "05:00"
       timezone: "Europe/Paris"
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: chore
+      prefix-development: chore
+      include: scope
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]

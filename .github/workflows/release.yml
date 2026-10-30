@@ -10,13 +10,21 @@ on:
 permissions:
   contents: read
 
+# A release must never overlap another, and a half-published one is worse
+# than a queued one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   ci:
+    # A reusable-workflow call cannot set timeout-minutes. ci.yml's jobs each set theirs.
     uses: ./.github/workflows/ci.yml
 
   version:
     name: tag matches the project version
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -39,6 +47,7 @@ jobs:
     name: publish the image to GHCR
     needs: [ci, version]
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: read
       packages: write
@@ -84,6 +93,7 @@ jobs:
     name: GitHub release
     needs: [image]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
     steps:
