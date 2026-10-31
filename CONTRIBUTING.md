@@ -17,30 +17,14 @@ uv installs the one Python `.python-version` names. Without
 [mise](https://mise.jdx.dev), install by hand the uv version `mise.toml` names:
 it is the one CI and the image use.
 
-`make help` lists the rest. Every target mirrors one job of
-`.github/workflows/ci.yml` and runs that job's commands, so a target green here
-is its job green there — which is why these commands are a Makefile rather than
-a list to copy from a page that drifts from the workflow.
+`make help` lists every target. Each one runs the commands of a CI job, so a
+target green here is its job green there. `make check` covers `lint`, `test`,
+`home-assistant` (minus hassfest and HACS) and `audit`; `package`, `image` and
+`secrets` run only in CI unless you call them by name.
 
-`make check` does not run all of them. It covers CI's `lint`, `test`,
-`home-assistant` and `audit` jobs; CI's `package`, `image` and `secrets` jobs
-run only in CI, unless you call their targets by name. A green `make check`
-says nothing about those three.
-
-| Target | The CI job it mirrors | In `make check` |
-| --------- | ------------------------------------------------------------- | --- |
-| `lint` | `lint` — ruff's rules and formatting, checked, not applied | yes |
-| `typecheck` | `lint` — mypy, strict, over the sources and the tests | yes |
-| `test` | `test` — pytest with coverage, against a throwaway MQTT broker | yes |
-| `test-ha` | `home-assistant` — minus hassfest and HACS, which are actions | yes |
-| `audit` | `audit` — known vulnerabilities in the locked production set | yes |
-| `package` | `package` — the wheel, used from an environment that has nothing else | no |
-| `image` | `image` — one architecture here, two on the runner | no |
-| `secrets` | `secrets` — the same gitleaks version | no |
-
-`make test` starts the MQTT broker itself and removes it afterwards. That
-matters: `tests/test_exporter_mqtt.py` is the one test that proves the exporter
-really speaks MQTT, and without a broker it *skips*, which reads as a pass.
+`make test` starts the MQTT broker itself and removes it afterwards:
+`tests/test_exporter_mqtt.py` is the one test that proves the exporter really
+speaks MQTT, and without a broker it *skips*, which reads as a pass.
 
 ## Conventions
 

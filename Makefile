@@ -1,18 +1,9 @@
-# releve — every command this repository has, in one place.
+# releve — the one driver for every command (mise.toml only pins uv and gitleaks).
 #
 # Each target runs the commands of one CI job (.github/workflows/ci.yml), so a
-# target green here is its job green there. That is the only reason this file
-# exists: the commands used to live as prose in CONTRIBUTING.md, where a flag
-# drifts from the workflow without anything noticing.
-#
-# `make check` covers CI's lint, test, home-assistant (less hassfest and HACS,
-# see test-ha) and audit jobs, in CI's order. CI's package, image and secrets
-# jobs are not in it: they run only in CI, unless their targets below are
-# called by name.
-#
-# One tool: uv. It owns the Python version (.python-version), the lockfile and
-# every dev dependency; nothing here needs a Python on the machine. uv itself,
-# and the gitleaks of `make secrets`, come from mise.toml (`mise install`).
+# target green here is its job green there. `make check` covers lint, test,
+# home-assistant (less hassfest and HACS) and audit; package, image and secrets
+# run only in CI unless called by name.
 
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
