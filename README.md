@@ -238,9 +238,8 @@ configuration or database, 3 another pass is already running.
 mise install && make setup && make check
 ```
 
-[CONTRIBUTING.md](CONTRIBUTING.md) says what each step does, which CI jobs
-`make check` covers and which it leaves to CI, and the conventions a change
-follows. The design is written down in [docs/architecture.md](docs/architecture.md).
+[CONTRIBUTING.md](CONTRIBUTING.md) has the targets, the conventions a change
+follows and how to cut a release. The design is written down in [docs/architecture.md](docs/architecture.md).
 Contributions are welcome, in English or French.
 
 ## License and notices

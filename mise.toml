@@ -1,28 +1,18 @@
-# The toolchain of this repository: the two binaries `make` needs beside Docker.
+# Tool pins only: `mise install` after a clone and after this file changes. The
+# commands live in the Makefile (`make help`). Python is not here: uv installs
+# the one .python-version names.
 #
-#   mise install     # after a clone, and after this file changes
+# uv is the uv of the Dockerfile and CI (setup-uv's `version`); gitleaks is what
+# `make secrets` and CI scan with. Move the other mentions of these versions
+# (Dockerfile, workflows, pyproject.toml's build backend, .pre-commit-config.yaml)
+# together with this file, then `mise install && mise lock` (mise.lock holds the
+# checksums for linux-arm64 and linux-x64).
 #
-# uv is the uv of the image (Dockerfile) and of CI (setup-uv's `version`): the
-# lock is written here by the uv that reads it there. gitleaks is what
-# `make secrets` and CI's secret scan run; CI installs it from this file
-# (`jdx/mise-action`), so both scan with one binary.
-#
-# pyproject.toml carries no `[tool.uv] required-version` on purpose: Dependabot's
-# uv updater runs its own uv, and uv refuses to run under any version but the
-# required one — every Python update would fail.
-#
-# `mise.lock`, beside this file and tracked, holds the checksum of each artefact
-# for linux-arm64 and linux-x64 (the runner). After changing a version:
-#   mise install && mise lock
-#
-# Python is not here: uv installs the one .python-version names.
-# Other mentions of these versions (Dockerfile, the workflows, pyproject.toml's
-# build backend, .pre-commit-config.yaml) move with this file.
+# pyproject.toml has no `[tool.uv] required-version` on purpose: Dependabot's uv
+# updater runs its own uv, and uv refuses any version but the required one.
 
-# mise itself. mise refuses to run below this version, so `make` and CI run the
-# same one. CI's `jdx/mise-action` cannot read this line and, given no
-# `version`, installs the newest release a day old: each of its steps repeats
-# the number, and the test holds them to it.
+# mise refuses to run below this version. CI's `jdx/mise-action` cannot read this
+# line, so each of its steps repeats the number (a test holds them to it).
 min_version = "2026.10.2"
 
 [tools]
