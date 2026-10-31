@@ -9,9 +9,8 @@ version: 2
 # Subjects are `chore(deps):`, and the label is `dependencies`.
 #
 # Versions are exact here (pyproject.toml, tests_ha/requirements.txt, Dockerfile),
-# and some are written in more than one file. tests/test_toolchain_pins.py turns
-# a half-moved pin red: the pull request then needs the other files moved by
-# hand (mise.toml, .python-version and the workflows' setup-uv version are not
+# and some are written in more than one file: move the other copies by hand
+# (mise.toml, .python-version and the workflows' setup-uv version are not
 # watched by Dependabot).
 updates:
   - package-ecosystem: "uv"

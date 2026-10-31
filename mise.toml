@@ -16,9 +16,8 @@
 #   mise install && mise lock
 #
 # Python is not here: uv installs the one .python-version names.
-# tests/test_toolchain_pins.py holds every other mention of these versions
-# (Dockerfile, the workflows, pyproject.toml's build backend,
-# .pre-commit-config.yaml) to this file.
+# Other mentions of these versions (Dockerfile, the workflows, pyproject.toml's
+# build backend, .pre-commit-config.yaml) move with this file.
 
 # mise itself. mise refuses to run below this version, so `make` and CI run the
 # same one. CI's `jdx/mise-action` cannot read this line and, given no

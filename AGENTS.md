@@ -43,9 +43,8 @@ The Home Assistant integration uses a second env (`.venv-ha`, same Python) from
 pip/venv workflows for the main package.
 
 **Pins:** each version has one source (`.python-version`, `mise.toml`,
-`pyproject.toml` with `==`). `tests/test_toolchain_pins.py` holds the rest in
-line. Change at the source, update what that test names, then `uv lock` /
-`mise lock` as needed. Do not add `[tool.uv] required-version`.
+`pyproject.toml` with `==`). Change at the source, update every copy (Dockerfile,
+workflows, pre-commit), then `uv lock` / `mise lock` as needed. Do not add `[tool.uv] required-version`.
 
 ## Layout
 

@@ -15,8 +15,7 @@ concurrency:
 
 # Python's version is not written in this file: uv installs the one
 # .python-version names — the Python the image runs. uv's own version is, on
-# every setup-uv step: it is mise.toml's, and tests/test_toolchain_pins.py
-# holds each of them to it.
+# every setup-uv step: it is mise.toml's; move them together.
 
 jobs:
   lint:
