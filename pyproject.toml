@@ -53,7 +53,7 @@ releve = "releve.cli:run"
 
 [dependency-groups]
 dev = [
-  "hypothesis==6.170.8",
+  "hypothesis==6.170.9",
   "mypy==2.4.0",
   "pip-audit==2.10.1",
   "pre-commit==4.7.0",
