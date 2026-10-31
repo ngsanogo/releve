@@ -75,8 +75,3 @@ Assistant (`tests_ha/`).
 6. **Errors are typed and journaled.** A pass records one outcome per subject
    (`rte`, each usage point, `export:<name>`); the scheduler logs a crashing
    pass with its traceback and keeps running.
-
-## Decisions
-
-Historical design notes live under [`docs/adr/`](adr/) — useful context, not
-constraints. Prefer this file and the code when behaviour is unclear.

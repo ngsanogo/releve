@@ -40,7 +40,7 @@ flowchart LR
   gap and left alone. A load-curve day published only partially is asked for
   again, without the gateway's cache, inside the calls made for missing days,
   so it never costs a call of its own. This lasts until the day is complete or
-  a week old ([details](docs/adr/0009-partial-load-curve-days.md)).
+  a week old.
 - **The cache never forgets.** Answers are upserted: one holding less never
   erases what the cache has. A load-curve day only ever gets better, and a
   point it drops is dropped by the exporters too.
@@ -240,8 +240,8 @@ mise install && make setup && make check
 
 [CONTRIBUTING.md](CONTRIBUTING.md) says what each step does, which CI jobs
 `make check` covers and which it leaves to CI, and the conventions a change
-follows. The design is written down in [docs/architecture.md](docs/architecture.md)
-and the [ADRs](docs/adr). Contributions are welcome, in English or French.
+follows. The design is written down in [docs/architecture.md](docs/architecture.md).
+Contributions are welcome, in English or French.
 
 ## License and notices
 

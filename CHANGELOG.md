@@ -77,7 +77,7 @@ with 0.2.0, which has no such command, stop releve and copy the database file.
   private (0600), never overwriting, and changing nothing in the database. `-`
   streams it to standard output (`docker exec releve releve backup - > copy.db`).
   The README says how to back up, restore and upgrade
-  ([ADR 0011](docs/adr/0011-operated-from-its-own-commands.md)).
+.
 - Load-curve points dropped from the cache are journaled (schema version 3).
   Home Assistant rewrites their day, and the InfluxDB exporter deletes them
   through `/api/v2/delete`. A destination without that endpoint, such as
@@ -104,7 +104,7 @@ with 0.2.0, which has no such command, stop releve and copy the database file.
 - Partially published load-curve days ride along in windows planned for missing
   days: they cost no call of their own, skip the gateway's cache, and no longer
   count among the days still to fetch in `releve status`, the dashboard and
-  `/metrics` ([ADR 0009](docs/adr/0009-partial-load-curve-days.md)).
+  `/metrics`.
 - A day's cached load curve only ever gets better: an answer that is not a
   complete grid never touches a complete day, a coarser grid never replaces a
   finer one, and fetching an unchanged day again changes and exports nothing.
