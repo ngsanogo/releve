@@ -1,5 +1,5 @@
 [build-system]
-requires = ["uv_build==0.13.5"]
+requires = ["uv_build==0.13.6"]
 build-backend = "uv_build"
 
 [project]
@@ -36,11 +36,11 @@ dependencies = [
   "httpx2==2.16.0",
   "jinja2==3.1.6",
   "paho-mqtt==2.1.0",
-  "pydantic==2.14.1",
+  "pydantic==2.14.2",
   "pydantic-settings[yaml]==2.16.1",
-  "starlette==1.9.0",
+  "starlette==1.10.0",
   "uvicorn==0.54.0",
-  "websockets==17.3",
+  "websockets==17.4",
 ]
 
 [project.urls]
@@ -53,14 +53,14 @@ releve = "releve.cli:run"
 
 [dependency-groups]
 dev = [
-  "hypothesis==6.170.9",
-  "mypy==2.4.0",
+  "hypothesis==6.170.14",
+  "mypy==2.4.1",
   "pip-audit==2.10.1",
   "pre-commit==4.7.0",
-  "pytest==9.1.1",
+  "pytest==9.2.0",
   "pytest-cov==7.1.0",
-  "ruff==0.17.2",
-  "types-PyYAML==6.0.12.20260906",
+  "ruff==0.17.3",
+  "types-PyYAML==6.0.12.20261030",
 ]
 
 [tool.ruff]
