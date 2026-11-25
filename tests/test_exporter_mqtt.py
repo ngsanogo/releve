@@ -141,7 +141,9 @@ def test_messages_reach_a_real_broker_retained() -> None:
 
     received: list[bytes] = []
     subscriber = paho.Client(CallbackAPIVersion.VERSION2)
-    subscriber.on_message = lambda _client, _userdata, message: received.append(message.payload)
+    subscriber.on_message = lambda _client, _userdata, message: received.append(
+        bytes(message.payload)
+    )
     subscriber.connect(host, int(port))
     subscriber.subscribe(topic, qos=1)
     for _ in range(50):
