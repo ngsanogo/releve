@@ -6,9 +6,7 @@ from collections.abc import Callable
 from typing import Any
 
 import pytest
-from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
-
-pytest_plugins = ["pytest_homeassistant_custom_component"]
+from pytest_homeassistant.test_util.aiohttp import AiohttpClientMocker
 
 URL = "http://releve.test:8080"
 PDL = "01234567890123"
@@ -39,6 +37,12 @@ GRID: dict[str, Any] = {
 }
 
 type Serve = Callable[..., None]
+
+
+@pytest.fixture
+def hass_config_dir(hass_tmp_config_dir: str) -> str:
+    """Each test's Home Assistant writes its files in a temporary directory, not in tests_ha/."""
+    return hass_tmp_config_dir
 
 
 @pytest.fixture(autouse=True)
