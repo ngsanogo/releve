@@ -6,6 +6,12 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- The Home Assistant integration is tested against Home Assistant 2026.11.2,
+  through `pytest-homeassistant`, the test package Home Assistant now publishes
+  from its core. `pytest-homeassistant-custom-component` was declared broken by
+  its author on 2026-11-03 and stayed on 2026.10.4.
+
 ## [0.3.4] - 2026-10-17
 
 ### Changed

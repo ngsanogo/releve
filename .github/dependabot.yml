@@ -43,9 +43,8 @@ updates:
       - dependency-name: "uv-build"
 
   # The Home Assistant the integration is tested against (tests_ha/requirements.txt):
-  # pytest-homeassistant-custom-component pins homeassistant, one release each —
-  # betas included, under an ordinary version number. Check which Home Assistant
-  # a bump brings before merging it.
+  # pytest-homeassistant is Home Assistant core's test package and carries its
+  # version number: a bump of it is a bump of the Home Assistant under test.
   - package-ecosystem: "pip"
     directory: "/tests_ha"
     schedule:
